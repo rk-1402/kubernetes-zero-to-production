@@ -1,0 +1,10 @@
+# ==============================================================
+# Manifests extracted from: CNI Plugins
+# Source: Kubernetes Complete Interview Study Notes
+# ==============================================================
+
+# ---8<--- (1) Topic 23 — CNI Plugins (Calico, Cilium, VPC CNI, GKE Dataplane V2) ---8<---
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+networking: { disableDefaultCNI: true }
+nodes: [{ role: control-plane }, { role: worker }]

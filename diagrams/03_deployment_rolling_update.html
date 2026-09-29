@@ -1,0 +1,97 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/><title>Deployment Rolling Update</title>
+<style>
+:root{--blue:#2563eb;--green:#059669;--teal:#0e7490;--purple:#7c3aed;--amber:#d97706;--red:#dc2626;--ink:#0f172a;--mut:#64748b;--line:#cbd5e1;--bg:#f8fafc;--card:#fff;}
+*{box-sizing:border-box}
+body{margin:0;font-family:'Segoe UI',Helvetica,Arial,sans-serif;background:var(--bg);color:var(--ink);}
+.wrap{max-width:980px;margin:0 auto;padding:18px 16px 44px;}
+h1{font-size:20px;margin:0 0 2px;color:#1e3a8a;}
+.sub{color:var(--mut);font-size:13px;margin-bottom:14px;}
+.sub code,.cap code{background:#eef2ff;color:#3730a3;padding:1px 5px;border-radius:4px;font-family:Menlo,Consolas,monospace;}
+.stage-card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:8px;box-shadow:0 1px 3px rgba(0,0,0,.06);}
+svg{width:100%;height:auto;display:block}
+.box{fill:#fff;stroke:var(--line);stroke-width:2;transition:all .5s ease;}
+.box.hot{stroke:var(--blue);stroke-width:3.5;filter:drop-shadow(0 0 6px rgba(37,99,235,.35));}
+.box.ok{stroke:var(--green);stroke-width:3.5;filter:drop-shadow(0 0 6px rgba(5,150,105,.3));}
+.box.warn{stroke:var(--amber);stroke-width:3.5;}
+.box.deny{stroke:var(--red);stroke-width:3.5;}
+.lbl{font:600 14px 'Segoe UI';fill:var(--ink);}
+.sublbl{font:11px 'Segoe UI';fill:var(--mut);}
+.band{fill:#f1f5f9;stroke:#e2e8f0;}
+.bandlbl{font:700 11px 'Segoe UI';fill:#475569;letter-spacing:.5px;}
+.flow{stroke:var(--line);stroke-width:2.5;fill:none;marker-end:url(#arh);}
+.flow.live{stroke:var(--blue);stroke-dasharray:7 6;animation:dash 1s linear infinite;}
+.flow.ok{stroke:var(--green);stroke-dasharray:7 6;animation:dash 1s linear infinite;marker-end:url(#arhg);}
+.flow.deny{stroke:var(--red);stroke-dasharray:2 5;}
+@keyframes dash{to{stroke-dashoffset:-26}}
+.dyn{opacity:0;transition:all .55s ease;} .dyn.show{opacity:1;}
+.pod{fill:#e2e8f0;stroke:#94a3b8;stroke-width:2;transform-box:fill-box;transform-origin:center;}
+.pod.run{fill:#bbf7d0;stroke:var(--green);} .pod.warn{fill:#fde68a;stroke:var(--amber);} .pod.deny{fill:#fecaca;stroke:var(--red);}
+.pod.pulse{animation:pp 1.4s ease-in-out infinite;}
+@keyframes pp{0%,100%{transform:scale(1)}50%{transform:scale(1.07)}}
+.lamp{fill:#e2e8f0;stroke:#94a3b8;stroke-width:1.5;} .lamp.ok{fill:#22c55e;stroke:#16a34a;} .lamp.warn{fill:#f59e0b;stroke:#d97706;} .lamp.bad{fill:#ef4444;stroke:#dc2626;}
+.controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:14px 0 10px;}
+button{font:600 13px 'Segoe UI';border:1px solid var(--line);background:#fff;color:var(--ink);padding:8px 14px;border-radius:8px;cursor:pointer;}
+button.primary{background:var(--blue);color:#fff;border-color:var(--blue);} button:hover{filter:brightness(.97)}
+.stepn{color:var(--mut);font-size:13px;margin-left:auto;}
+.cap{background:#eff6ff;border-left:4px solid var(--blue);border-radius:8px;padding:12px 14px;font-size:14px;min-height:46px;}
+.cap b{color:#1e3a8a;}
+.foot{color:var(--mut);font-size:12px;margin-top:12px;}
+</style></head><body><div class="wrap">
+<h1>Deployment Rolling Update</h1><div class="sub">Topic 8 · new ReplicaSet scales up as the old scales down · maxSurge / maxUnavailable</div>
+<div class="stage-card">
+<svg id="stage" viewBox="0 0 900 445" data-step="0">
+<defs>
+<marker id="arh" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#94a3b8"/></marker>
+<marker id="arhg" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#059669"/></marker>
+</defs>
+
+<g id="bsvc"><rect class="box" x="360" y="20" width="180" height="50" rx="10"/><text x="450.0" y="39.0" text-anchor="middle" class="lbl">Service</text><text x="450.0" y="57.0" text-anchor="middle" class="sublbl">selector app=web</text></g>
+<rect class="band" x="20" y="95" width="860" height="150" rx="14"/><text x="34" y="117" class="bandlbl">ReplicaSet v1 (image :1.26)</text>
+<rect id="v10" class="dyn pod" x="60" y="150" width="72" height="46" rx="10"/><rect id="v11" class="dyn pod" x="150" y="150" width="72" height="46" rx="10"/><rect id="v12" class="dyn pod" x="240" y="150" width="72" height="46" rx="10"/><rect id="v13" class="dyn pod" x="330" y="150" width="72" height="46" rx="10"/>
+<rect class="band" x="20" y="270" width="860" height="150" rx="14"/><text x="34" y="292" class="bandlbl">ReplicaSet v2 (image :1.27)</text>
+<rect id="v20" class="dyn pod" x="60" y="325" width="72" height="46" rx="10"/><rect id="v21" class="dyn pod" x="150" y="325" width="72" height="46" rx="10"/><rect id="v22" class="dyn pod" x="240" y="325" width="72" height="46" rx="10"/><rect id="v23" class="dyn pod" x="330" y="325" width="72" height="46" rx="10"/>
+<path class="flow" d="M450 70 V95"/>
+
+</svg></div>
+<div class="controls">
+<button id="prev">&#8249; Prev</button><button id="next">Next &#8250;</button>
+<span class="stepn" id="stepn"></span></div>
+<div class="cap" id="cap"></div>
+<div class="foot">A Deployment keeps one ReplicaSet per revision — that history is what makes <b>rollback</b> instant.</div>
+</div>
+<script>
+const S=document.getElementById('stage'),cap=document.getElementById('cap'),stepn=document.getElementById('stepn');
+const STEPS=[
+  {"cap": "<b>Start.</b> Deployment <code>web</code> runs 4 pods on ReplicaSet v1. <code>maxSurge:1, maxUnavailable:0</code> = zero-downtime.", "ok": ["bsvc"], "on": ["v10", "v11", "v12", "v13"], "cls": [["v10", "run"], ["v11", "run"], ["v12", "run"], ["v13", "run"]]},
+  {"cap": "<b>Surge +1.</b> A new v2 pod is created above the desired count (that's <code>maxSurge:1</code>). It is not Ready yet.", "on": ["v10", "v11", "v12", "v13", "v20"], "cls": [["v10", "run"], ["v20", "run"], ["v11", "run"], ["v12", "run"], ["v20", "warn"]]},
+  {"cap": "<b>v2 pod becomes Ready</b> and passes its readinessProbe \u2014 now it can take traffic.", "ok": ["bsvc"], "on": ["v10", "v11", "v12", "v13", "v20"], "cls": [["v10", "run"], ["v20", "run"], ["v11", "run"], ["v12", "run"], ["v13", "run"]]},
+  {"cap": "<b>Scale down v1 &minus;1.</b> Only after a new pod is Ready does an old one terminate \u2014 availability never drops below 4.", "on": ["v11", "v12", "v13", "v20"], "cls": [["v20", "run"], ["v11", "run"], ["v12", "run"], ["v13", "run"]]},
+  {"cap": "<b>Repeat.</b> Surge another v2, wait for Ready, retire another v1\u2026", "ok": ["bsvc"], "on": ["v12", "v13", "v20", "v21"], "cls": [["v20", "run"], ["v21", "run"], ["v12", "run"], ["v13", "run"]]},
+  {"cap": "<b>Rolled out.</b> All 4 pods are on v2, v1 is empty. <code>kubectl rollout status</code> returns success.", "ok": ["bsvc"], "on": ["v20", "v21", "v22", "v23"], "cls": [["v20", "run"], ["v21", "run"], ["v22", "run"], ["v23", "run"]]},
+  {"cap": "<b>Rollback in seconds.</b> <code>kubectl rollout undo</code> scales the old ReplicaSet (kept in history) back up \u2014 same mechanism in reverse.", "ok": ["bsvc"], "on": ["v10", "v11", "v12", "v13"], "cls": [["v10", "run"], ["v11", "run"], ["v12", "run"], ["v13", "run"]]}
+];
+let i=0,timer=null;
+function setStep(n){
+  i=(n+STEPS.length)%STEPS.length;const st=STEPS[i];S.setAttribute('data-step',i);
+  document.querySelectorAll('.box').forEach(b=>b.classList.remove('hot','ok','warn','deny'));
+  document.querySelectorAll('.flow').forEach(f=>f.classList.remove('live','ok','deny'));
+  document.querySelectorAll('.dyn').forEach(d=>d.classList.remove('show','run','pulse','warn','deny','ok'));
+  document.querySelectorAll('.lamp').forEach(l=>l.classList.remove('ok','warn','bad'));
+  (st.hot||[]).forEach(id=>{const b=document.querySelector('#'+id+' .box'); if(b)b.classList.add('hot');});
+  (st.ok||[]).forEach(id=>{const b=document.querySelector('#'+id+' .box'); if(b)b.classList.add('ok');});
+  (st.warn||[]).forEach(id=>{const b=document.querySelector('#'+id+' .box'); if(b)b.classList.add('warn');});
+  (st.deny||[]).forEach(id=>{const b=document.querySelector('#'+id+' .box'); if(b)b.classList.add('deny');});
+  (st.flows||[]).forEach(f=>{const e=document.getElementById(f); if(e)e.classList.add('live');});
+  (st.flowsok||[]).forEach(f=>{const e=document.getElementById(f); if(e)e.classList.add('ok');});
+  (st.flowsdeny||[]).forEach(f=>{const e=document.getElementById(f); if(e)e.classList.add('deny');});
+  (st.on||[]).forEach(id=>{const e=document.getElementById(id); if(e)e.classList.add('show');});
+  (st.cls||[]).forEach(a=>{const e=document.getElementById(a[0]); if(e)e.classList.add(a[1]);});
+  cap.innerHTML=st.cap;stepn.textContent='Step '+i+' / '+(STEPS.length-1);
+}
+const DELAY=2000;
+function loopTimer(){clearInterval(timer);timer=setInterval(()=>setStep(i+1),DELAY);}
+document.getElementById('next').onclick=()=>{setStep(i+1);loopTimer();};
+document.getElementById('prev').onclick=()=>{setStep(i-1);loopTimer();};
+setStep(0);loopTimer();
+</script></body></html>

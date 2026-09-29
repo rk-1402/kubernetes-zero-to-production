@@ -1,0 +1,84 @@
+# ==============================================================
+# Manifests extracted from: StatefulSets
+# Source: Kubernetes Complete Interview Study Notes
+# ==============================================================
+
+# ---8<--- (1) Topic 9 — StatefulSets ---8<---
+apiVersion: v1
+kind: Service
+metadata: { name: pg }
+spec:
+  clusterIP: None
+  selector: { app: pg }
+  ports: [{ port: 5432 }]
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata: { name: pg }
+spec:
+  serviceName: pg
+  replicas: 3
+  selector: { matchLabels: { app: pg } }
+  template:
+    metadata: { labels: { app: pg } }
+    spec:
+      terminationGracePeriodSeconds: 60
+      containers:
+      - name: pg
+        image: postgres:16
+        ports: [{ containerPort: 5432, name: pg }]
+        env:
+        - { name: POSTGRES_PASSWORD, valueFrom: { secretKeyRef: { name: pg-secret, key: password } } }
+        - { name: PGDATA, value: /var/lib/postgresql/data/pgdata }
+        volumeMounts:
+        - { name: data, mountPath: /var/lib/postgresql/data }
+        readinessProbe:
+          exec: { command: ["pg_isready","-U","postgres"] }
+          periodSeconds: 5
+  volumeClaimTemplates:
+  - metadata: { name: data }
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      resources: { requests: { storage: 10Gi } }
+      storageClassName: standard-rwo
+  persistentVolumeClaimRetentionPolicy:
+    whenDeleted: Retain
+    whenScaled:  Retain
+
+# ---8<--- (2) Topic 9 — StatefulSets ---8<---
+# sts.yaml
+apiVersion: v1
+kind: Service
+metadata: { name: nginx-sts }
+spec:
+  clusterIP: None
+  selector: { app: web }
+  ports: [{ port: 80 }]
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata: { name: web }
+spec:
+  serviceName: nginx-sts
+  replicas: 3
+  selector: { matchLabels: { app: web } }
+  template:
+    metadata: { labels: { app: web } }
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:1.27
+        volumeMounts: [{ name: data, mountPath: /usr/share/nginx/html }]
+  volumeClaimTemplates:
+  - metadata: { name: data }
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      resources: { requests: { storage: 1Gi } }
+
+# ---8<--- (3) Topic 9 — StatefulSets ---8<---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata: { name: ebs-wait }
+provisioner: ebs.csi.aws.com
+parameters: { type: gp3 }
+volumeBindingMode: WaitForFirstConsumer

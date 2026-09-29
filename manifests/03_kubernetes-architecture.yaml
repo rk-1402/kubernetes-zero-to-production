@@ -1,0 +1,27 @@
+# ==============================================================
+# Manifests extracted from: Kubernetes Architecture
+# Source: Kubernetes Complete Interview Study Notes
+# ==============================================================
+
+# ---8<--- (1) Topic 3 — Kubernetes Architecture ---8<---
+# /etc/kubernetes/manifests/kube-apiserver.yaml   (managed by kubeadm)
+apiVersion: v1
+kind: Pod
+metadata: { name: kube-apiserver, namespace: kube-system }
+spec:
+  containers:
+  - name: kube-apiserver
+    image: registry.k8s.io/kube-apiserver:v1.31.0
+    command:
+    - kube-apiserver
+    - --advertise-address=10.0.0.10
+    - --etcd-servers=https://127.0.0.1:2379
+    - --service-cluster-ip-range=10.96.0.0/12
+
+# ---8<--- (2) Topic 3 — Kubernetes Architecture ---8<---
+apiVersion: v1
+kind: Pod
+metadata: { name: gluttony }
+spec:
+  containers:
+  - { name: c, image: pause:3.9, resources: { requests: { memory: "100Gi" } } }

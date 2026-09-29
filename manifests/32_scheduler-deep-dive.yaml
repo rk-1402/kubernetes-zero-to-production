@@ -1,0 +1,24 @@
+# ==============================================================
+# Manifests extracted from: Scheduler Deep Dive
+# Source: Kubernetes Complete Interview Study Notes
+# ==============================================================
+
+# ---8<--- (1) Topic 32 — Scheduler Deep Dive ---8<---
+apiVersion: kubescheduler.config.k8s.io/v1
+kind: KubeSchedulerConfiguration
+profiles:
+- schedulerName: default-scheduler
+  plugins:
+    score:
+      enabled:
+      - { name: NodeResourcesFit, weight: 2 }
+      - { name: ImageLocality, weight: 1 }
+  pluginConfig:
+  - name: NodeResourcesFit
+    args:
+      scoringStrategy:
+        type: LeastAllocated
+        resources:
+        - { name: cpu, weight: 1 }
+        - { name: memory, weight: 1 }
+percentageOfNodesToScore: 50

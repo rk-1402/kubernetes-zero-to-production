@@ -1,0 +1,44 @@
+# ==============================================================
+# Manifests extracted from: Service Mesh
+# Source: Kubernetes Complete Interview Study Notes
+# ==============================================================
+
+# ---8<--- (1) Topic 25 — Service Mesh Overview (Istio, Linkerd) ---8<---
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata: { name: reviews }
+spec:
+  hosts: [reviews]
+  http:
+  - route:
+    - destination: { host: reviews, subset: v1 }
+      weight: 90
+    - destination: { host: reviews, subset: v2 }
+      weight: 10
+---
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata: { name: reviews }
+spec:
+  host: reviews
+  subsets:
+  - { name: v1, labels: { version: v1 } }
+  - { name: v2, labels: { version: v2 } }
+
+# ---8<--- (2) Topic 25 — Service Mesh Overview (Istio, Linkerd) ---8<---
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata: { name: strict, namespace: prod }
+spec:
+  mtls: { mode: STRICT }
+
+# ---8<--- (3) Topic 25 — Service Mesh Overview (Istio, Linkerd) ---8<---
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata: { name: allow-api, namespace: prod }
+spec:
+  selector: { matchLabels: { app: db } }
+  action: ALLOW
+  rules:
+  - from: [{ source: { principals: ["cluster.local/ns/prod/sa/api"] } }]
+    to: [{ operation: { ports: ["5432"] } }]

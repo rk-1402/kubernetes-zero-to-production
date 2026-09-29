@@ -1,0 +1,101 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/><title>Horizontal Pod Autoscaler (HPA)</title>
+<style>
+:root{--blue:#2563eb;--green:#059669;--teal:#0e7490;--purple:#7c3aed;--amber:#d97706;--red:#dc2626;--ink:#0f172a;--mut:#64748b;--line:#cbd5e1;--bg:#f8fafc;--card:#fff;}
+*{box-sizing:border-box}
+body{margin:0;font-family:'Segoe UI',Helvetica,Arial,sans-serif;background:var(--bg);color:var(--ink);}
+.wrap{max-width:980px;margin:0 auto;padding:18px 16px 44px;}
+h1{font-size:20px;margin:0 0 2px;color:#1e3a8a;}
+.sub{color:var(--mut);font-size:13px;margin-bottom:14px;}
+.sub code,.cap code{background:#eef2ff;color:#3730a3;padding:1px 5px;border-radius:4px;font-family:Menlo,Consolas,monospace;}
+.stage-card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:8px;box-shadow:0 1px 3px rgba(0,0,0,.06);}
+svg{width:100%;height:auto;display:block}
+.box{fill:#fff;stroke:var(--line);stroke-width:2;transition:all .5s ease;}
+.box.hot{stroke:var(--blue);stroke-width:3.5;filter:drop-shadow(0 0 6px rgba(37,99,235,.35));}
+.box.ok{stroke:var(--green);stroke-width:3.5;filter:drop-shadow(0 0 6px rgba(5,150,105,.3));}
+.box.warn{stroke:var(--amber);stroke-width:3.5;}
+.box.deny{stroke:var(--red);stroke-width:3.5;}
+.lbl{font:600 14px 'Segoe UI';fill:var(--ink);}
+.sublbl{font:11px 'Segoe UI';fill:var(--mut);}
+.band{fill:#f1f5f9;stroke:#e2e8f0;}
+.bandlbl{font:700 11px 'Segoe UI';fill:#475569;letter-spacing:.5px;}
+.flow{stroke:var(--line);stroke-width:2.5;fill:none;marker-end:url(#arh);}
+.flow.live{stroke:var(--blue);stroke-dasharray:7 6;animation:dash 1s linear infinite;}
+.flow.ok{stroke:var(--green);stroke-dasharray:7 6;animation:dash 1s linear infinite;marker-end:url(#arhg);}
+.flow.deny{stroke:var(--red);stroke-dasharray:2 5;}
+@keyframes dash{to{stroke-dashoffset:-26}}
+.dyn{opacity:0;transition:all .55s ease;} .dyn.show{opacity:1;}
+.pod{fill:#e2e8f0;stroke:#94a3b8;stroke-width:2;transform-box:fill-box;transform-origin:center;}
+.pod.run{fill:#bbf7d0;stroke:var(--green);} .pod.warn{fill:#fde68a;stroke:var(--amber);} .pod.deny{fill:#fecaca;stroke:var(--red);}
+.pod.pulse{animation:pp 1.4s ease-in-out infinite;}
+@keyframes pp{0%,100%{transform:scale(1)}50%{transform:scale(1.07)}}
+.lamp{fill:#e2e8f0;stroke:#94a3b8;stroke-width:1.5;} .lamp.ok{fill:#22c55e;stroke:#16a34a;} .lamp.warn{fill:#f59e0b;stroke:#d97706;} .lamp.bad{fill:#ef4444;stroke:#dc2626;}
+.controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:14px 0 10px;}
+button{font:600 13px 'Segoe UI';border:1px solid var(--line);background:#fff;color:var(--ink);padding:8px 14px;border-radius:8px;cursor:pointer;}
+button.primary{background:var(--blue);color:#fff;border-color:var(--blue);} button:hover{filter:brightness(.97)}
+.stepn{color:var(--mut);font-size:13px;margin-left:auto;}
+.cap{background:#eff6ff;border-left:4px solid var(--blue);border-radius:8px;padding:12px 14px;font-size:14px;min-height:46px;}
+.cap b{color:#1e3a8a;}
+.foot{color:var(--mut);font-size:12px;margin-top:12px;}
+</style></head><body><div class="wrap">
+<h1>Horizontal Pod Autoscaler (HPA)</h1><div class="sub">Topic 51 · desired = ceil(current &#215; actual/target) · pods scale to match load</div>
+<div class="stage-card">
+<svg id="stage" viewBox="0 0 900 445" data-step="0">
+<defs>
+<marker id="arh" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#94a3b8"/></marker>
+<marker id="arhg" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#059669"/></marker>
+</defs>
+
+<g id="bms"><rect class="box" x="40" y="40" width="180" height="66" rx="10"/><text x="130.0" y="67.0" text-anchor="middle" class="lbl">metrics-server</text><text x="130.0" y="85.0" text-anchor="middle" class="sublbl">CPU / memory</text></g>
+<g id="bhpa"><rect class="box" x="360" y="40" width="200" height="80" rx="10"/><text x="460.0" y="74.0" text-anchor="middle" class="lbl">HPA controller</text><text x="460.0" y="92.0" text-anchor="middle" class="sublbl">every 15s</text></g>
+<g id="bdep"><rect class="box" x="700" y="40" width="160" height="66" rx="10"/><text x="780.0" y="67.0" text-anchor="middle" class="lbl">Deployment</text><text x="780.0" y="85.0" text-anchor="middle" class="sublbl">replicas</text></g>
+<text x="360" y="150" class="sublbl">desired = ceil( current &#215; actual / target )</text>
+<rect x="360" y="165" width="200" height="18" rx="9" fill="#e2e8f0"/>
+<rect id="gauge" class="dyn" x="360" y="165" width="0" height="18" rx="9" fill="#ef4444" style="opacity:1"/>
+<text id="cpu" x="570" y="179" class="sublbl">CPU 30%</text>
+<rect class="band" x="20" y="220" width="860" height="210" rx="14"/><text x="34" y="242" class="bandlbl">PODS (target 70% CPU)</text>
+<rect id="hp0" class="dyn pod" x="60" y="300" width="72" height="46" rx="10"/><rect id="hp1" class="dyn pod" x="155" y="300" width="72" height="46" rx="10"/><rect id="hp2" class="dyn pod" x="250" y="300" width="72" height="46" rx="10"/><rect id="hp3" class="dyn pod" x="345" y="300" width="72" height="46" rx="10"/><rect id="hp4" class="dyn pod" x="440" y="300" width="72" height="46" rx="10"/><rect id="hp5" class="dyn pod" x="535" y="300" width="72" height="46" rx="10"/><rect id="hp6" class="dyn pod" x="630" y="300" width="72" height="46" rx="10"/><rect id="hp7" class="dyn pod" x="725" y="300" width="72" height="46" rx="10"/>
+<path class="flow" d="M220 73 H356"/><path class="flow" d="M560 73 H696"/>
+<path class="flow" d="M780 106 C 820 180, 500 200, 300 250"/>
+
+</svg></div>
+<div class="controls">
+<button id="prev">&#8249; Prev</button><button id="next">Next &#8250;</button>
+<span class="stepn" id="stepn"></span></div>
+<div class="cap" id="cap"></div>
+<div class="foot">HPA needs <b>resource requests</b> set and metrics-server installed — utilization is <i>actual / request</i>.</div>
+</div>
+<script>
+const S=document.getElementById('stage'),cap=document.getElementById('cap'),stepn=document.getElementById('stepn');
+const STEPS=[
+  {"cap": "<b>Quiet.</b> 3 pods, CPU ~30% \u2014 comfortably under the 70% target. HPA does nothing.", "ok": ["bms"], "on": ["hp0", "hp1", "hp2"], "cls": [["hp0", "run"], ["hp1", "run"], ["hp2", "run"], ["gauge", "show"], ["gauge", "show"]]},
+  {"cap": "<b>Load rises.</b> metrics-server reports CPU climbing toward the target. HPA recomputes <code>desired</code> every 15s.", "hot": ["bhpa", "bms"], "on": ["hp0", "hp1", "hp2"], "cls": [["hp0", "run"], ["hp1", "run"], ["hp2", "run"], ["gauge", "show"]]},
+  {"cap": "<b>Scale up.</b> CPU at ~140% of target &rarr; <code>ceil(3 &times; 1.4)=6</code>. HPA patches the Deployment to 6 replicas; new pods spin up fast (0s stabilization).", "hot": ["bhpa", "bdep"], "on": ["hp0", "hp1", "hp2", "hp3", "hp4", "hp5"], "cls": [["hp0", "run"], ["hp1", "run"], ["hp2", "run"], ["hp3", "run"], ["hp4", "run"], ["hp5", "run"], ["gauge", "show"]]},
+  {"cap": "<b>Peak.</b> Still hot &rarr; HPA grows to 8 (bounded by <code>maxReplicas</code>). Capacity now matches demand.", "hot": ["bdep"], "on": ["hp0", "hp1", "hp2", "hp3", "hp4", "hp5", "hp6", "hp7"], "cls": [["hp0", "run"], ["hp1", "run"], ["hp2", "run"], ["hp3", "run"], ["hp4", "run"], ["hp5", "run"], ["hp6", "run"], ["hp7", "run"], ["gauge", "show"]]},
+  {"cap": "<b>Load drops</b>, but HPA waits out the <code>scaleDown.stabilizationWindow</code> (default 300s) to avoid flapping before removing pods.", "ok": ["bms"], "on": ["hp0", "hp1", "hp2", "hp3", "hp4", "hp5", "hp6", "hp7"], "cls": [["hp0", "run"], ["hp1", "run"], ["hp2", "run"], ["hp3", "run"], ["hp4", "run"], ["hp5", "run"], ["hp6", "run"], ["hp7", "run"], ["gauge", "show"]]},
+  {"cap": "<b>Scale back down</b> gradually (max 10%/min) to 3 \u2014 no thrashing, and no manual intervention.", "ok": ["bdep"], "on": ["hp0", "hp1", "hp2"], "cls": [["hp0", "run"], ["hp1", "run"], ["hp2", "run"], ["gauge", "show"]]}
+];
+let i=0,timer=null;
+function setStep(n){
+  i=(n+STEPS.length)%STEPS.length;const st=STEPS[i];S.setAttribute('data-step',i);
+  document.querySelectorAll('.box').forEach(b=>b.classList.remove('hot','ok','warn','deny'));
+  document.querySelectorAll('.flow').forEach(f=>f.classList.remove('live','ok','deny'));
+  document.querySelectorAll('.dyn').forEach(d=>d.classList.remove('show','run','pulse','warn','deny','ok'));
+  document.querySelectorAll('.lamp').forEach(l=>l.classList.remove('ok','warn','bad'));
+  (st.hot||[]).forEach(id=>{const b=document.querySelector('#'+id+' .box'); if(b)b.classList.add('hot');});
+  (st.ok||[]).forEach(id=>{const b=document.querySelector('#'+id+' .box'); if(b)b.classList.add('ok');});
+  (st.warn||[]).forEach(id=>{const b=document.querySelector('#'+id+' .box'); if(b)b.classList.add('warn');});
+  (st.deny||[]).forEach(id=>{const b=document.querySelector('#'+id+' .box'); if(b)b.classList.add('deny');});
+  (st.flows||[]).forEach(f=>{const e=document.getElementById(f); if(e)e.classList.add('live');});
+  (st.flowsok||[]).forEach(f=>{const e=document.getElementById(f); if(e)e.classList.add('ok');});
+  (st.flowsdeny||[]).forEach(f=>{const e=document.getElementById(f); if(e)e.classList.add('deny');});
+  (st.on||[]).forEach(id=>{const e=document.getElementById(id); if(e)e.classList.add('show');});
+  (st.cls||[]).forEach(a=>{const e=document.getElementById(a[0]); if(e)e.classList.add(a[1]);});
+  cap.innerHTML=st.cap;stepn.textContent='Step '+i+' / '+(STEPS.length-1);
+}
+const DELAY=2000;
+function loopTimer(){clearInterval(timer);timer=setInterval(()=>setStep(i+1),DELAY);}
+document.getElementById('next').onclick=()=>{setStep(i+1);loopTimer();};
+document.getElementById('prev').onclick=()=>{setStep(i-1);loopTimer();};
+setStep(0);loopTimer();
+</script></body></html>

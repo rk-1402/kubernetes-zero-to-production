@@ -1,0 +1,51 @@
+# ==============================================================
+# Manifests extracted from: Persistent Volume Claims
+# Source: Kubernetes Complete Interview Study Notes
+# ==============================================================
+
+# ---8<--- (1) Topic 28 — Persistent Volume Claims (PVC) ---8<---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata: { name: app-data }
+spec:
+  accessModes: [ReadWriteOnce]
+  resources: { requests: { storage: 20Gi } }
+  storageClassName: standard-rwo
+
+# ---8<--- (2) Topic 28 — Persistent Volume Claims (PVC) ---8<---
+apiVersion: v1
+kind: Pod
+metadata: { name: writer }
+spec:
+  containers:
+  - name: app
+    image: busybox
+    command: ["sh","-c","echo persist > /data/test.txt; sleep 3600"]
+    volumeMounts: [{ name: data, mountPath: /data }]
+  volumes:
+  - name: data
+    persistentVolumeClaim: { claimName: app-data }
+
+# ---8<--- (3) Topic 28 — Persistent Volume Claims (PVC) ---8<---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata: { name: app-data-clone }
+spec:
+  accessModes: [ReadWriteOnce]
+  resources: { requests: { storage: 20Gi } }
+  storageClassName: standard-rwo
+  dataSource:
+    kind: PersistentVolumeClaim
+    name: app-data
+
+# ---8<--- (4) Topic 28 — Persistent Volume Claims (PVC) ---8<---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata: { name: app-data-restored }
+spec:
+  accessModes: [ReadWriteOnce]
+  resources: { requests: { storage: 20Gi } }
+  storageClassName: standard-rwo
+  dataSource:
+    kind: VolumeSnapshot
+    name: snap-app-data-2024

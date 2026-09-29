@@ -1,0 +1,25 @@
+# ==============================================================
+# Manifests extracted from: Containers VMs Kubernetes
+# Source: Kubernetes Complete Interview Study Notes
+# ==============================================================
+
+# ---8<--- (1) Topic 2 — Containers vs VMs vs Kubernetes ---8<---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: web }
+spec:
+  replicas: 3
+  selector: { matchLabels: { app: web } }
+  template:
+    metadata: { labels: { app: web } }
+    spec:
+      containers:
+      - { name: nginx, image: nginx:1.27, ports: [{ containerPort: 80 }] }
+
+# ---8<--- (2) Topic 2 — Containers vs VMs vs Kubernetes ---8<---
+apiVersion: v1
+kind: Pod
+metadata: { name: fg-demo, labels: { app: fg } }
+spec:
+  containers:
+  - { name: c, image: nginx:1.27 }

@@ -1,0 +1,13 @@
+# ==============================================================
+# Manifests extracted from: Lab Environment Setup
+# Source: Kubernetes Complete Interview Study Notes
+# ==============================================================
+
+# ---8<--- (1) Pre-Module — Lab Environment Setup ---8<---
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: k8s-lab
+nodes:
+- role: control-plane
+- role: worker
+- role: worker

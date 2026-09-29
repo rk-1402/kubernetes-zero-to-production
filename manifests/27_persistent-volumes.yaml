@@ -1,0 +1,72 @@
+# ==============================================================
+# Manifests extracted from: Persistent Volumes
+# Source: Kubernetes Complete Interview Study Notes
+# ==============================================================
+
+# ---8<--- (1) Topic 27 — Persistent Volumes (PV) ---8<---
+apiVersion: v1
+kind: PersistentVolume
+metadata: { name: nfs-data }
+spec:
+  capacity: { storage: 100Gi }
+  accessModes: [ReadWriteMany]
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: ""               # no class = static
+  nfs:
+    server: 10.0.0.50
+    path: /exports/data
+
+# ---8<--- (2) Topic 27 — Persistent Volumes (PV) ---8<---
+apiVersion: v1
+kind: PersistentVolume
+metadata: { name: gce-disk }
+spec:
+  capacity: { storage: 50Gi }
+  accessModes: [ReadWriteOnce]
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: standard-rwo
+  csi:
+    driver: pd.csi.storage.gke.io
+    volumeHandle: projects/myproj/zones/us-east1-b/disks/my-disk
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - { key: topology.gke.io/zone, operator: In, values: [us-east1-b] }
+
+# ---8<--- (3) Topic 27 — Persistent Volumes (PV) ---8<---
+apiVersion: v1
+kind: PersistentVolume
+metadata: { name: ebs-disk }
+spec:
+  capacity: { storage: 50Gi }
+  accessModes: [ReadWriteOnce]
+  persistentVolumeReclaimPolicy: Retain
+  csi:
+    driver: ebs.csi.aws.com
+    volumeHandle: vol-0abcdef1234567890
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - { key: topology.ebs.csi.aws.com/zone, operator: In, values: [ap-south-1a] }
+
+# ---8<--- (4) Topic 27 — Persistent Volumes (PV) ---8<---
+# pv.yaml
+apiVersion: v1
+kind: PersistentVolume
+metadata: { name: lab-pv }
+spec:
+  capacity: { storage: 1Gi }
+  accessModes: [ReadWriteOnce]
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: manual
+  hostPath: { path: /mnt/data }
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata: { name: lab-pvc }
+spec:
+  accessModes: [ReadWriteOnce]
+  resources: { requests: { storage: 1Gi } }
+  storageClassName: manual

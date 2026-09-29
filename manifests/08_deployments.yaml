@@ -1,0 +1,73 @@
+# ==============================================================
+# Manifests extracted from: Deployments
+# Source: Kubernetes Complete Interview Study Notes
+# ==============================================================
+
+# ---8<--- (1) Topic 8 — Deployments (Rolling Updates, Rollbacks, Strategies) ---8<---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+  labels: { app: web }
+spec:
+  replicas: 5
+  revisionHistoryLimit: 5
+  progressDeadlineSeconds: 300
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 0        # zero-downtime rollouts
+  minReadySeconds: 10
+  selector:
+    matchLabels: { app: web }
+  template:
+    metadata: { labels: { app: web } }
+    spec:
+      terminationGracePeriodSeconds: 45
+      containers:
+      - name: app
+        image: myrepo/web:1.4.2
+        ports: [{ containerPort: 8080 }]
+        resources:
+          requests: { cpu: 100m, memory: 128Mi }
+          limits:   { cpu: 500m, memory: 512Mi }
+        startupProbe:
+          httpGet: { path: /healthz, port: 8080 }
+          failureThreshold: 30
+          periodSeconds: 2
+        readinessProbe:
+          httpGet: { path: /ready, port: 8080 }
+          periodSeconds: 5
+        livenessProbe:
+          httpGet: { path: /healthz, port: 8080 }
+          periodSeconds: 10
+        lifecycle:
+          preStop:
+            exec: { command: ["/bin/drain","--wait=20s"] }
+
+# ---8<--- (2) Topic 8 — Deployments (Rolling Updates, Rollbacks, Strategies) ---8<---
+apiVersion: v1
+kind: Service
+metadata: { name: web }
+spec:
+  selector: { app: web }        # matches both stable and canary
+  ports: [{ port: 80, targetPort: 8080 }]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: web-stable }
+spec:
+  replicas: 9
+  selector: { matchLabels: { app: web, track: stable } }
+  template: { metadata: { labels: { app: web, track: stable } },
+              spec: { containers: [{ name: c, image: myrepo/web:1.4.2 }] } }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: web-canary }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: web, track: canary } }
+  template: { metadata: { labels: { app: web, track: canary } },
+              spec: { containers: [{ name: c, image: myrepo/web:1.4.3 }] } }

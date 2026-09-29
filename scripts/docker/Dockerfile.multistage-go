@@ -1,0 +1,10 @@
+# Topic 2 — multi-stage build -> tiny distroless image (~10 MB, no shell)
+FROM golang:1.22 AS build
+WORKDIR /src
+COPY . .
+RUN CGO_ENABLED=0 go build -o /out/app ./cmd/api
+
+FROM gcr.io/distroless/static:nonroot
+COPY --from=build /out/app /app
+USER nonroot
+ENTRYPOINT ["/app"]

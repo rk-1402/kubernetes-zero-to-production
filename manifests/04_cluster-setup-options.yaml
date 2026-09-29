@@ -1,0 +1,29 @@
+# ==============================================================
+# Manifests extracted from: Cluster Setup Options
+# Source: Kubernetes Complete Interview Study Notes
+# ==============================================================
+
+# ---8<--- (1) Topic 4 — Cluster Setup Options ---8<---
+# kind-ha.yaml
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+nodes:
+- role: control-plane
+- role: control-plane
+- role: control-plane
+- role: worker
+- role: worker
+- role: worker
+
+# ---8<--- (2) Topic 4 — Cluster Setup Options ---8<---
+# cluster.yaml
+apiVersion: eksctl.io/v1alpha5
+kind: ClusterConfig
+metadata: { name: prod, region: ap-south-1, version: "1.31" }
+managedNodeGroups:
+- name: general
+  instanceType: t3.medium
+  desiredCapacity: 2
+  minSize: 1
+  maxSize: 5
+  volumeSize: 50

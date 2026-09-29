@@ -1,0 +1,52 @@
+# ==============================================================
+# Manifests extracted from: Namespaces
+# Source: Kubernetes Complete Interview Study Notes
+# ==============================================================
+
+# ---8<--- (1) Topic 17 — Namespaces ---8<---
+# 1. Namespace
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: team-alpha
+  labels:
+    pod-security.kubernetes.io/enforce: restricted
+    team: alpha
+---
+# 2. ResourceQuota
+apiVersion: v1
+kind: ResourceQuota
+metadata: { name: quota, namespace: team-alpha }
+spec:
+  hard:
+    requests.cpu: "8"
+    requests.memory: 16Gi
+    limits.cpu: "16"
+    limits.memory: 32Gi
+    pods: "50"
+---
+# 3. LimitRange
+apiVersion: v1
+kind: LimitRange
+metadata: { name: defaults, namespace: team-alpha }
+spec:
+  limits:
+  - type: Container
+    default:        { cpu: 500m, memory: 256Mi }
+    defaultRequest: { cpu: 100m, memory: 128Mi }
+---
+# 4. RBAC
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata: { name: alpha-devs, namespace: team-alpha }
+subjects:
+- { kind: Group, name: alpha-devs, apiGroup: rbac.authorization.k8s.io }
+roleRef: { kind: ClusterRole, name: edit, apiGroup: rbac.authorization.k8s.io }
+---
+# 5. NetworkPolicy — deny all ingress by default
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: { name: deny-all, namespace: team-alpha }
+spec:
+  podSelector: {}
+  policyTypes: [Ingress]

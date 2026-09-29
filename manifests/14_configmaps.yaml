@@ -1,0 +1,53 @@
+# ==============================================================
+# Manifests extracted from: ConfigMaps
+# Source: Kubernetes Complete Interview Study Notes
+# ==============================================================
+
+# ---8<--- (1) Topic 14 — ConfigMaps ---8<---
+apiVersion: v1
+kind: Pod
+metadata: { name: web }
+spec:
+  containers:
+  - name: app
+    image: nginx:1.27
+    env:
+    - name: LOG_LEVEL
+      valueFrom: { configMapKeyRef: { name: app-config, key: LOG_LEVEL } }
+    envFrom:
+    - configMapRef: { name: app-config }        # every key
+    volumeMounts:
+    - { name: nginx-conf, mountPath: /etc/nginx/nginx.conf, subPath: nginx.conf }
+  volumes:
+  - name: nginx-conf
+    configMap:
+      name: app-config
+      items:
+      - { key: nginx.conf, path: nginx.conf }
+
+# ---8<--- (2) Topic 14 — ConfigMaps ---8<---
+apiVersion: v1
+kind: ConfigMap
+metadata: { name: app-config-v2 }
+immutable: true
+data:
+  LOG_LEVEL: info
+  FEATURE_X: "true"
+
+# ---8<--- (3) Topic 14 — ConfigMaps ---8<---
+apiVersion: secrets-store.csi.x-k8s.io/v1
+kind: SecretProviderClass
+metadata: { name: aws-secret }
+spec:
+  provider: aws
+  parameters:
+    objects: |
+      - objectName: "prod/api-config"
+        objectType: "secretsmanager"
+        jmesPath:
+        - path: LOG_LEVEL
+          objectAlias: LOG_LEVEL
+  secretObjects:
+  - secretName: sync-cm
+    type: Opaque
+    data: [{ objectName: LOG_LEVEL, key: LOG_LEVEL }]

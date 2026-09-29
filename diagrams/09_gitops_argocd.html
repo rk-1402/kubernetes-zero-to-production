@@ -1,0 +1,100 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/><title>GitOps: ArgoCD Sync &amp; Self-Heal</title>
+<style>
+:root{--blue:#2563eb;--green:#059669;--teal:#0e7490;--purple:#7c3aed;--amber:#d97706;--red:#dc2626;--ink:#0f172a;--mut:#64748b;--line:#cbd5e1;--bg:#f8fafc;--card:#fff;}
+*{box-sizing:border-box}
+body{margin:0;font-family:'Segoe UI',Helvetica,Arial,sans-serif;background:var(--bg);color:var(--ink);}
+.wrap{max-width:980px;margin:0 auto;padding:18px 16px 44px;}
+h1{font-size:20px;margin:0 0 2px;color:#1e3a8a;}
+.sub{color:var(--mut);font-size:13px;margin-bottom:14px;}
+.sub code,.cap code{background:#eef2ff;color:#3730a3;padding:1px 5px;border-radius:4px;font-family:Menlo,Consolas,monospace;}
+.stage-card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:8px;box-shadow:0 1px 3px rgba(0,0,0,.06);}
+svg{width:100%;height:auto;display:block}
+.box{fill:#fff;stroke:var(--line);stroke-width:2;transition:all .5s ease;}
+.box.hot{stroke:var(--blue);stroke-width:3.5;filter:drop-shadow(0 0 6px rgba(37,99,235,.35));}
+.box.ok{stroke:var(--green);stroke-width:3.5;filter:drop-shadow(0 0 6px rgba(5,150,105,.3));}
+.box.warn{stroke:var(--amber);stroke-width:3.5;}
+.box.deny{stroke:var(--red);stroke-width:3.5;}
+.lbl{font:600 14px 'Segoe UI';fill:var(--ink);}
+.sublbl{font:11px 'Segoe UI';fill:var(--mut);}
+.band{fill:#f1f5f9;stroke:#e2e8f0;}
+.bandlbl{font:700 11px 'Segoe UI';fill:#475569;letter-spacing:.5px;}
+.flow{stroke:var(--line);stroke-width:2.5;fill:none;marker-end:url(#arh);}
+.flow.live{stroke:var(--blue);stroke-dasharray:7 6;animation:dash 1s linear infinite;}
+.flow.ok{stroke:var(--green);stroke-dasharray:7 6;animation:dash 1s linear infinite;marker-end:url(#arhg);}
+.flow.deny{stroke:var(--red);stroke-dasharray:2 5;}
+@keyframes dash{to{stroke-dashoffset:-26}}
+.dyn{opacity:0;transition:all .55s ease;} .dyn.show{opacity:1;}
+.pod{fill:#e2e8f0;stroke:#94a3b8;stroke-width:2;transform-box:fill-box;transform-origin:center;}
+.pod.run{fill:#bbf7d0;stroke:var(--green);} .pod.warn{fill:#fde68a;stroke:var(--amber);} .pod.deny{fill:#fecaca;stroke:var(--red);}
+.pod.pulse{animation:pp 1.4s ease-in-out infinite;}
+@keyframes pp{0%,100%{transform:scale(1)}50%{transform:scale(1.07)}}
+.lamp{fill:#e2e8f0;stroke:#94a3b8;stroke-width:1.5;} .lamp.ok{fill:#22c55e;stroke:#16a34a;} .lamp.warn{fill:#f59e0b;stroke:#d97706;} .lamp.bad{fill:#ef4444;stroke:#dc2626;}
+.controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:14px 0 10px;}
+button{font:600 13px 'Segoe UI';border:1px solid var(--line);background:#fff;color:var(--ink);padding:8px 14px;border-radius:8px;cursor:pointer;}
+button.primary{background:var(--blue);color:#fff;border-color:var(--blue);} button:hover{filter:brightness(.97)}
+.stepn{color:var(--mut);font-size:13px;margin-left:auto;}
+.cap{background:#eff6ff;border-left:4px solid var(--blue);border-radius:8px;padding:12px 14px;font-size:14px;min-height:46px;}
+.cap b{color:#1e3a8a;}
+.foot{color:var(--mut);font-size:12px;margin-top:12px;}
+</style></head><body><div class="wrap">
+<h1>GitOps: ArgoCD Sync &amp; Self-Heal</h1><div class="sub">Topic 61 · Git is the source of truth · the cluster is continuously reconciled to it</div>
+<div class="stage-card">
+<svg id="stage" viewBox="0 0 900 445" data-step="0">
+<defs>
+<marker id="arh" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#94a3b8"/></marker>
+<marker id="arhg" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#059669"/></marker>
+</defs>
+
+<g id="bdev"><rect class="box" x="40" y="60" width="120" height="60" rx="10"/><text x="100.0" y="84.0" text-anchor="middle" class="lbl">Developer</text><text x="100.0" y="102.0" text-anchor="middle" class="sublbl">git push</text></g>
+<g id="brepo"><rect class="box" x="220" y="60" width="160" height="66" rx="10"/><text x="300.0" y="87.0" text-anchor="middle" class="lbl">Config Repo</text><text x="300.0" y="105.0" text-anchor="middle" class="sublbl">Git = source of truth</text></g>
+<g id="bargo"><rect class="box" x="470" y="60" width="170" height="66" rx="10"/><text x="555.0" y="87.0" text-anchor="middle" class="lbl">ArgoCD</text><text x="555.0" y="105.0" text-anchor="middle" class="sublbl">detect diff</text></g>
+<g id="bcluster"><rect class="box" x="720" y="60" width="140" height="66" rx="10"/><text x="790.0" y="87.0" text-anchor="middle" class="lbl">Cluster</text><text x="790.0" y="105.0" text-anchor="middle" class="sublbl">live state</text></g>
+<rect class="band" x="20" y="180" width="860" height="240" rx="14"/><text x="34" y="202" class="bandlbl">CLUSTER STATE</text>
+<g id="bapp"><rect class="box" x="120" y="250" width="200" height="80" rx="10"/><text x="220.0" y="284.0" text-anchor="middle" class="lbl">Deployment web</text><text x="220.0" y="302.0" text-anchor="middle" class="sublbl">replicas: 3, img :1.4</text></g>
+<text id="drift" class="dyn lbl" x="520" y="290" style="fill:#dc2626;opacity:0" text-anchor="middle">&#9888; manual kubectl edit &#8594; OutOfSync</text>
+<path id="f_push" class="flow" d="M160 90 H216"/>
+<path id="f_watch" class="flow" d="M380 93 H466"/>
+<path id="f_sync" class="flow" d="M640 93 H716"/>
+<path id="f_apply" class="flow" d="M790 126 C 820 200, 400 210, 322 260"/>
+
+</svg></div>
+<div class="controls">
+<button id="prev">&#8249; Prev</button><button id="next">Next &#8250;</button>
+<span class="stepn" id="stepn"></span></div>
+<div class="cap" id="cap"></div>
+<div class="foot">Drift isn't a bug &mdash; detecting and healing it is the whole point. Rollback = <code>git revert</code>.</div>
+</div>
+<script>
+const S=document.getElementById('stage'),cap=document.getElementById('cap'),stepn=document.getElementById('stepn');
+const STEPS=[
+  {"cap": "<b>Change as a commit.</b> The developer pushes a manifest change to the Git config repo \u2014 the single source of truth. No one runs <code>kubectl</code> against prod.", "hot": ["bdev", "brepo"], "flows": ["f_push"]},
+  {"cap": "<b>ArgoCD detects the diff</b> between Git (desired) and the cluster (live), marking the app <i>OutOfSync</i>.", "hot": ["bargo"], "flows": ["f_watch"]},
+  {"cap": "<b>Sync.</b> ArgoCD applies the manifests to the cluster; the Deployment rolls to the new spec &mdash; <i>Synced / Healthy</i>.", "hot": ["bargo", "bcluster"], "flows": ["f_sync", "f_apply"], "ok": ["bapp"], "cls": [["bapp", "ok"]]},
+  {"cap": "<b>Drift happens.</b> Someone hand-edits the live Deployment with <code>kubectl</code>. Now the cluster no longer matches Git \u2014 <i>OutOfSync</i> again.", "warn": ["bapp"], "on": ["drift"], "cls": [["bapp", "warn"]]},
+  {"cap": "<b>Self-heal.</b> With <code>selfHeal:true</code>, ArgoCD automatically reverts the drift back to what Git says. Git always wins.", "ok": ["bapp", "bcluster"], "flowsok": ["f_apply"], "cls": [["bapp", "ok"]]}
+];
+let i=0,timer=null;
+function setStep(n){
+  i=(n+STEPS.length)%STEPS.length;const st=STEPS[i];S.setAttribute('data-step',i);
+  document.querySelectorAll('.box').forEach(b=>b.classList.remove('hot','ok','warn','deny'));
+  document.querySelectorAll('.flow').forEach(f=>f.classList.remove('live','ok','deny'));
+  document.querySelectorAll('.dyn').forEach(d=>d.classList.remove('show','run','pulse','warn','deny','ok'));
+  document.querySelectorAll('.lamp').forEach(l=>l.classList.remove('ok','warn','bad'));
+  (st.hot||[]).forEach(id=>{const b=document.querySelector('#'+id+' .box'); if(b)b.classList.add('hot');});
+  (st.ok||[]).forEach(id=>{const b=document.querySelector('#'+id+' .box'); if(b)b.classList.add('ok');});
+  (st.warn||[]).forEach(id=>{const b=document.querySelector('#'+id+' .box'); if(b)b.classList.add('warn');});
+  (st.deny||[]).forEach(id=>{const b=document.querySelector('#'+id+' .box'); if(b)b.classList.add('deny');});
+  (st.flows||[]).forEach(f=>{const e=document.getElementById(f); if(e)e.classList.add('live');});
+  (st.flowsok||[]).forEach(f=>{const e=document.getElementById(f); if(e)e.classList.add('ok');});
+  (st.flowsdeny||[]).forEach(f=>{const e=document.getElementById(f); if(e)e.classList.add('deny');});
+  (st.on||[]).forEach(id=>{const e=document.getElementById(id); if(e)e.classList.add('show');});
+  (st.cls||[]).forEach(a=>{const e=document.getElementById(a[0]); if(e)e.classList.add(a[1]);});
+  cap.innerHTML=st.cap;stepn.textContent='Step '+i+' / '+(STEPS.length-1);
+}
+const DELAY=2000;
+function loopTimer(){clearInterval(timer);timer=setInterval(()=>setStep(i+1),DELAY);}
+document.getElementById('next').onclick=()=>{setStep(i+1);loopTimer();};
+document.getElementById('prev').onclick=()=>{setStep(i-1);loopTimer();};
+setStep(0);loopTimer();
+</script></body></html>

@@ -1,0 +1,72 @@
+# Capstone 2 — CI/CD: build -> Trivy scan -> push to GAR+ECR -> helm upgrade (GKE + EKS)
+# File: .github/workflows/deploy.yaml
+name: build-and-deploy
+on:
+  push: { branches: [main] }
+permissions:
+  id-token: write
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    outputs: { tag: "${{ steps.meta.outputs.tag }}" }
+    steps:
+      - uses: actions/checkout@v4
+      - id: meta
+        run: echo "tag=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+      - uses: docker/setup-buildx-action@v3
+      - name: Auth GCP
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: projects/123/locations/global/workloadIdentityPools/gh/providers/gh
+          service_account: ci@my-project.iam.gserviceaccount.com
+      - name: Auth ECR
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::111111111111:role/gha-oidc
+          aws-region: us-east-1
+      - run: gcloud auth configure-docker us-central1-docker.pkg.dev -q
+      - run: aws ecr get-login-password | docker login --username AWS --password-stdin 111111111111.dkr.ecr.us-east-1.amazonaws.com
+      - name: Build & push frontend
+        run: |
+          docker buildx build --push \
+            -t us-central1-docker.pkg.dev/my-project/shop/frontend:${{ steps.meta.outputs.tag }} \
+            -t 111111111111.dkr.ecr.us-east-1.amazonaws.com/shop/frontend:${{ steps.meta.outputs.tag }} frontend/
+      - name: Trivy scan
+        uses: aquasecurity/trivy-action@0.20.0
+        with:
+          image-ref: 'us-central1-docker.pkg.dev/my-project/shop/frontend:${{ steps.meta.outputs.tag }}'
+          exit-code: '1'
+          severity: 'CRITICAL,HIGH'
+  deploy-gke:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: google-github-actions/auth@v2
+        with: { workload_identity_provider: "...", service_account: "ci@..." }
+      - uses: google-github-actions/get-gke-credentials@v2
+        with: { cluster_name: capstone1, location: us-central1 }
+      - name: Helm upgrade
+        run: |
+          helm upgrade --install shop charts/shop \
+            --namespace shop --create-namespace \
+            --set image.tag=${{ needs.build.outputs.tag }} \
+            --atomic --timeout 5m --wait
+      - name: Smoke test
+        run: kubectl -n shop rollout status deploy/frontend
+  deploy-eks:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with: { role-to-assume: arn:aws:iam::111111111111:role/gha-oidc, aws-region: us-east-1 }
+      - run: aws eks update-kubeconfig --name capstone1
+      - name: Helm upgrade
+        run: |
+          helm upgrade --install shop charts/shop \
+            --namespace shop --create-namespace \
+            --set image.tag=${{ needs.build.outputs.tag }} \
+            --set image.registry=111111111111.dkr.ecr.us-east-1.amazonaws.com/shop \
+            --atomic --timeout 5m --wait

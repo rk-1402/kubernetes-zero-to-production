@@ -1,0 +1,61 @@
+# ==============================================================
+# Manifests extracted from: StatefulSet Storage Patterns
+# Source: Kubernetes Complete Interview Study Notes
+# ==============================================================
+
+# ---8<--- (1) Topic 31 — StatefulSet Storage Patterns ---8<---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata: { name: pg }
+spec:
+  serviceName: pg
+  replicas: 3
+  selector: { matchLabels: { app: pg } }
+  template:
+    metadata: { labels: { app: pg } }
+    spec:
+      topologySpreadConstraints:
+      - maxSkew: 1
+        topologyKey: topology.kubernetes.io/zone
+        whenUnsatisfiable: DoNotSchedule
+        labelSelector: { matchLabels: { app: pg } }
+      containers:
+      - name: pg
+        image: postgres:16
+        ports: [{ containerPort: 5432 }]
+        env: [{ name: PGDATA, value: /var/lib/postgresql/data/pgdata }]
+        envFrom: [{ secretRef: { name: pg-cred } }]
+        volumeMounts: [{ name: data, mountPath: /var/lib/postgresql/data }]
+        readinessProbe:
+          exec: { command: ["pg_isready","-U","postgres"] }
+          periodSeconds: 5
+        resources:
+          requests: { cpu: 500m, memory: 1Gi }
+          limits:   { cpu: 2,    memory: 4Gi }
+  volumeClaimTemplates:
+  - metadata: { name: data }
+    spec:
+      accessModes: [ReadWriteOnce]
+      resources: { requests: { storage: 50Gi } }
+      storageClassName: gp3     # or standard-rwo on GKE
+  persistentVolumeClaimRetentionPolicy:
+    whenDeleted: Retain
+    whenScaled:  Retain
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata: { name: pg-backup }
+spec:
+  schedule: "0 2 * * *"
+  timeZone: "Asia/Kolkata"
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+          - name: dump
+            image: postgres:16
+            command: ["sh","-c","pg_dump -h pg-0.pg -U postgres mydb | gzip > /backup/$(date +%Y%m%d).sql.gz && aws s3 cp /backup/*.gz s3://backups/pg/"]
+            envFrom: [{ secretRef: { name: pg-cred } }]

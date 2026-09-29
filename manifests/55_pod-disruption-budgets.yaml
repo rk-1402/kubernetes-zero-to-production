@@ -1,0 +1,28 @@
+# ==============================================================
+# Manifests extracted from: Pod Disruption Budgets
+# Source: Kubernetes Complete Interview Study Notes
+# ==============================================================
+
+# ---8<--- (1) Topic 55 — Pod Disruption Budgets (PDB) ---8<---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata: { name: web-pdb }
+spec:
+  selector: { matchLabels: { app: web } }
+  minAvailable: 2        # OR maxUnavailable: 1 (use one, not both)
+
+# ---8<--- (2) Topic 55 — Pod Disruption Budgets (PDB) ---8<---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata: { name: api-pdb }
+spec:
+  minAvailable: 2
+  selector: { matchLabels: { app: api } }
+
+# ---8<--- (3) Topic 55 — Pod Disruption Budgets (PDB) ---8<---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata: { name: web-pdb }
+spec:
+  maxUnavailable: "25%"
+  selector: { matchLabels: { app: web } }

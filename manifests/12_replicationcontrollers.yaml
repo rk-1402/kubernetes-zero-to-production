@@ -1,0 +1,35 @@
+# ==============================================================
+# Manifests extracted from: ReplicationControllers
+# Source: Kubernetes Complete Interview Study Notes
+# ==============================================================
+
+# ---8<--- (1) Topic 12 — ReplicationControllers (Legacy) ---8<---
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: web
+spec:
+  replicas: 3
+  selector:
+    app: web                   # equality only
+  template:
+    metadata:
+      labels: { app: web }
+    spec:
+      containers:
+      - { name: nginx, image: nginx:1.27, ports: [{ containerPort: 80 }] }
+
+# ---8<--- (2) Topic 12 — ReplicationControllers (Legacy) ---8<---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+spec:
+  replicas: 3
+  selector:
+    matchLabels: { app: web }
+  template:
+    metadata: { labels: { app: web } }
+    spec:
+      containers:
+      - { name: nginx, image: nginx:1.27, ports: [{ containerPort: 80 }] }

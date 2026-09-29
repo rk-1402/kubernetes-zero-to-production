@@ -1,0 +1,109 @@
+# ==============================================================
+# Manifests extracted from: module_10_topics_62_to_66
+# Source: Kubernetes Complete Interview Study Notes
+# ==============================================================
+
+# ---8<--- (1) Topic 62 — Admission Controllers (Mutating & Validating) ---8<---
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingWebhookConfiguration
+metadata:
+  name: sidecar-injector.example.com
+webhooks:
+  - name: sidecar.example.com
+    admissionReviewVersions: ["v1"]
+    sideEffects: None
+    timeoutSeconds: 5
+    failurePolicy: Ignore   # Fail-open so cluster works if webhook is down
+    reinvocationPolicy: IfNeeded
+    clientConfig:
+      service:
+        name: sidecar-injector
+        namespace: platform
+        path: /mutate
+        port: 443
+      caBundle: <base64-ca>
+    rules:
+      - apiGroups: [""]
+        apiVersions: ["v1"]
+        resources: ["pods"]
+        operations: ["CREATE"]
+    namespaceSelector:
+      matchLabels:
+        sidecar-injection: enabled
+    objectSelector:
+      matchExpressions:
+        - key: sidecar.example.com/inject
+          operator: NotIn
+          values: ["false"]
+
+# ---8<--- (2) Topic 62 — Admission Controllers (Mutating & Validating) ---8<---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: "disallow-latest-tag"
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+      - apiGroups: ["apps"]
+        apiVersions: ["v1"]
+        operations: ["CREATE","UPDATE"]
+        resources: ["deployments","statefulsets","daemonsets"]
+  validations:
+    - expression: >-
+        object.spec.template.spec.containers.all(c,
+          !c.image.endsWith(':latest') && c.image.contains(':'))
+      message: "Container images must have an explicit non-'latest' tag."
+      reason: Invalid
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: "disallow-latest-tag-binding"
+spec:
+  policyName: "disallow-latest-tag"
+  validationActions: [Deny, Audit, Warn]
+  matchResources:
+    namespaceSelector:
+      matchLabels:
+        environment: production
+
+# ---8<--- (3) Topic 62 — Admission Controllers (Mutating & Validating) ---8<---
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-resource-limits
+spec:
+  validationFailureAction: Enforce
+  background: true
+  rules:
+    - name: check-limits
+      match:
+        any:
+          - resources:
+              kinds: [Pod]
+      validate:
+        message: "CPU and memory limits are required."
+        pattern:
+          spec:
+            containers:
+              - resources:
+                  limits:
+                    cpu: "?*"
+                    memory: "?*"
+
+# ---8<--- (4) Topic 62 — Admission Controllers (Mutating & Validating) ---8<---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata: { name: require-team-label }
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+    - apiGroups: [""]
+      apiVersions: ["v1"]
+      operations: ["CREATE","UPDATE"]
+      resources: ["pods"]
+  validations:
+    - expression: "has(object.metadata.labels) && has(object.metadata.labels.team)"
+      message: "Pods must have a 'team' label."

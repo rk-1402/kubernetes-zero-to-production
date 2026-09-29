@@ -1,0 +1,72 @@
+# ==============================================================
+# Manifests extracted from: DaemonSets
+# Source: Kubernetes Complete Interview Study Notes
+# ==============================================================
+
+# ---8<--- (1) Topic 10 — DaemonSets ---8<---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: fluent-bit
+  namespace: logging
+spec:
+  selector: { matchLabels: { app: fluent-bit } }
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate: { maxUnavailable: 1 }
+  template:
+    metadata: { labels: { app: fluent-bit } }
+    spec:
+      serviceAccountName: fluent-bit
+      tolerations:
+      - operator: Exists                 # run on every node, including tainted
+      containers:
+      - name: fluent-bit
+        image: fluent/fluent-bit:3.1
+        resources:
+          requests: { cpu: 50m, memory: 64Mi }
+          limits:   { cpu: 200m, memory: 200Mi }
+        volumeMounts:
+        - { name: varlog, mountPath: /var/log, readOnly: true }
+        - { name: varlibdocker, mountPath: /var/lib/docker/containers, readOnly: true }
+        - { name: config, mountPath: /fluent-bit/etc }
+      volumes:
+      - { name: varlog, hostPath: { path: /var/log } }
+      - { name: varlibdocker, hostPath: { path: /var/lib/docker/containers } }
+      - { name: config, configMap: { name: fluent-bit-config } }
+
+# ---8<--- (2) Topic 10 — DaemonSets ---8<---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata: { name: node-exporter, namespace: monitoring }
+spec:
+  selector: { matchLabels: { app: node-exporter } }
+  template:
+    metadata: { labels: { app: node-exporter } }
+    spec:
+      hostNetwork: true
+      hostPID: true
+      containers:
+      - name: ne
+        image: prom/node-exporter:v1.8.2
+        args: ["--path.rootfs=/host", "--web.listen-address=0.0.0.0:9100"]
+        ports: [{ containerPort: 9100, hostPort: 9100 }]
+        volumeMounts: [{ name: root, mountPath: /host, readOnly: true }]
+      volumes: [{ name: root, hostPath: { path: / } }]
+      tolerations: [{ operator: Exists }]
+
+# ---8<--- (3) Topic 10 — DaemonSets ---8<---
+# ds.yaml
+apiVersion: apps/v1
+kind: DaemonSet
+metadata: { name: ping }
+spec:
+  selector: { matchLabels: { app: ping } }
+  template:
+    metadata: { labels: { app: ping } }
+    spec:
+      tolerations: [{ operator: Exists }]
+      containers:
+      - name: c
+        image: busybox:1.36
+        command: ["sh","-c","while true; do echo alive; sleep 30; done"]

@@ -1,0 +1,6 @@
+# Topic 2 — package the Python HTTP service (scripts/python/http_server_app.py)
+FROM python:3.12-slim
+WORKDIR /app
+COPY app.py .
+EXPOSE 8080
+CMD ["python", "app.py"]

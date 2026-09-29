@@ -1,0 +1,101 @@
+# ==============================================================
+# Manifests extracted from: Image Security Admission
+# Source: Kubernetes Complete Interview Study Notes
+# ==============================================================
+
+# ---8<--- (1) Topic 45 — Image Security and Admission Controllers (OPA/Gatekeeper, Kyverno) ---8<---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata: { name: require-labels }
+spec:
+  matchConstraints:
+    resourceRules: [{ apiGroups: ["apps"], apiVersions: ["v1"], resources: ["deployments"], operations: ["CREATE","UPDATE"] }]
+  validations:
+  - expression: "has(object.metadata.labels) && 'team' in object.metadata.labels"
+    message: "Deployment must have 'team' label"
+
+# ---8<--- (2) Topic 45 — Image Security and Admission Controllers (OPA/Gatekeeper, Kyverno) ---8<---
+# Kyverno
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata: { name: verify-images }
+spec:
+  validationFailureAction: Enforce
+  rules:
+  - name: verify-cosign
+    match: { any: [{ resources: { kinds: ["Pod"] } }] }
+    verifyImages:
+    - imageReferences: ["myrepo/*"]
+      attestors:
+      - entries:
+        - keys: { publicKeys: "-----BEGIN PUBLIC KEY-----\n..." }
+
+# ---8<--- (3) Topic 45 — Image Security and Admission Controllers (OPA/Gatekeeper, Kyverno) ---8<---
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata: { name: require-labels }
+spec:
+  validationFailureAction: Enforce
+  rules:
+  - name: check
+    match: { any: [{ resources: { kinds: ["Deployment","StatefulSet","DaemonSet"] } }] }
+    validate:
+      message: "Labels 'team' and 'env' are required."
+      pattern:
+        metadata:
+          labels:
+            team: "?*"
+            env: "?*"
+
+# ---8<--- (4) Topic 45 — Image Security and Admission Controllers (OPA/Gatekeeper, Kyverno) ---8<---
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata: { name: add-seccomp }
+spec:
+  rules:
+  - name: add-seccomp
+    match: { any: [{ resources: { kinds: ["Pod"] } }] }
+    mutate:
+      patchStrategicMerge:
+        spec:
+          securityContext:
+            seccompProfile:
+              type: RuntimeDefault
+
+# ---8<--- (5) Topic 45 — Image Security and Admission Controllers (OPA/Gatekeeper, Kyverno) ---8<---
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata: { name: restrict-registries }
+spec:
+  validationFailureAction: Enforce
+  rules:
+  - name: allowed-registries
+    match: { any: [{ resources: { kinds: ["Pod"] } }] }
+    validate:
+      message: "Images must come from approved registries."
+      pattern:
+        spec:
+          containers:
+          - image: "gcr.io/myproj/* | asia-south1-docker.pkg.dev/myproj/* | *.dkr.ecr.ap-south-1.amazonaws.com/*"
+
+# ---8<--- (6) Topic 45 — Image Security and Admission Controllers (OPA/Gatekeeper, Kyverno) ---8<---
+apiVersion: templates.gatekeeper.sh/v1
+kind: ConstraintTemplate
+metadata: { name: k8srequiredlimits }
+spec:
+  crd: { spec: { names: { kind: K8sRequiredLimits } } }
+  targets:
+  - target: admission.k8s.gatekeeper.sh
+    rego: |
+      package k8srequiredlimits
+      violation[{"msg": msg}] {
+        container := input.review.object.spec.containers[_]
+        not container.resources.limits.cpu
+        msg := sprintf("Container %v must have CPU limits", [container.name])
+      }
+---
+apiVersion: constraints.gatekeeper.sh/v1beta1
+kind: K8sRequiredLimits
+metadata: { name: require-limits }
+spec:
+  match: { kinds: [{ apiGroups: [""], kinds: ["Pod"] }] }

@@ -1,0 +1,49 @@
+# ==============================================================
+# Manifests extracted from: Priority Preemption
+# Source: Kubernetes Complete Interview Study Notes
+# ==============================================================
+
+# ---8<--- (1) Topic 36 — Pod Priority and Preemption ---8<---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata: { name: high }
+value: 1000000
+globalDefault: false
+preemptionPolicy: PreemptLowerPriority    # or Never
+description: "High priority workloads"
+
+# ---8<--- (2) Topic 36 — Pod Priority and Preemption ---8<---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata: { name: critical }
+value: 900000
+preemptionPolicy: PreemptLowerPriority
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata: { name: batch }
+value: 100
+preemptionPolicy: Never
+globalDefault: false
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata: { name: placeholder }
+value: -1
+preemptionPolicy: Never
+
+# ---8<--- (3) Topic 36 — Pod Priority and Preemption ---8<---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: overprovisioner }
+spec:
+  replicas: 5
+  selector: { matchLabels: { app: placeholder } }
+  template:
+    metadata: { labels: { app: placeholder } }
+    spec:
+      priorityClassName: placeholder
+      containers:
+      - name: pause
+        image: registry.k8s.io/pause:3.9
+        resources: { requests: { cpu: 2, memory: 4Gi } }

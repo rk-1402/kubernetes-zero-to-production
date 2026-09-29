@@ -1,0 +1,22 @@
+# ==============================================================
+# Manifests extracted from: Volumes
+# Source: Kubernetes Complete Interview Study Notes
+# ==============================================================
+
+# ---8<--- (1) Topic 26 — Volumes (emptyDir, hostPath, etc.) ---8<---
+apiVersion: v1
+kind: Pod
+metadata: { name: share }
+spec:
+  containers:
+  - name: writer
+    image: busybox
+    command: ["sh","-c","while true; do date >> /data/log.txt; sleep 5; done"]
+    volumeMounts: [{ name: shared, mountPath: /data }]
+  - name: reader
+    image: busybox
+    command: ["sh","-c","tail -f /data/log.txt"]
+    volumeMounts: [{ name: shared, mountPath: /data }]
+  volumes:
+  - name: shared
+    emptyDir: {}

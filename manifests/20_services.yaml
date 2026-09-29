@@ -1,0 +1,75 @@
+# ==============================================================
+# Manifests extracted from: Services
+# Source: Kubernetes Complete Interview Study Notes
+# ==============================================================
+
+# ---8<--- (1) Topic 20 — Services (ClusterIP, NodePort, LoadBalancer, ExternalName, Headless) ---8<---
+apiVersion: v1
+kind: Service
+metadata: { name: backend }
+spec:
+  selector: { app: api }
+  ports:
+  - { name: http, port: 80, targetPort: 8080 }
+  type: ClusterIP
+
+# ---8<--- (2) Topic 20 — Services (ClusterIP, NodePort, LoadBalancer, ExternalName, Headless) ---8<---
+apiVersion: v1
+kind: Service
+metadata: { name: web-np }
+spec:
+  selector: { app: web }
+  ports:
+  - { port: 80, targetPort: 80, nodePort: 30080 }
+  type: NodePort
+
+# ---8<--- (3) Topic 20 — Services (ClusterIP, NodePort, LoadBalancer, ExternalName, Headless) ---8<---
+apiVersion: v1
+kind: Service
+metadata:
+  name: web-lb
+  annotations:
+    # AWS NLB
+    service.beta.kubernetes.io/aws-load-balancer-type: nlb
+    service.beta.kubernetes.io/aws-load-balancer-scheme: internet-facing
+    # OR GKE Internal LB
+    # networking.gke.io/load-balancer-type: Internal
+spec:
+  selector: { app: web }
+  ports: [{ port: 80, targetPort: 80 }]
+  type: LoadBalancer
+  externalTrafficPolicy: Local
+
+# ---8<--- (4) Topic 20 — Services (ClusterIP, NodePort, LoadBalancer, ExternalName, Headless) ---8<---
+apiVersion: v1
+kind: Service
+metadata: { name: legacy-db }
+spec:
+  type: ExternalName
+  externalName: db.legacy.example.com
+
+# ---8<--- (5) Topic 20 — Services (ClusterIP, NodePort, LoadBalancer, ExternalName, Headless) ---8<---
+apiVersion: v1
+kind: Service
+metadata: { name: pg }
+spec:
+  clusterIP: None
+  selector: { app: pg }
+  ports: [{ port: 5432, name: pg }]
+
+# ---8<--- (6) Topic 20 — Services (ClusterIP, NodePort, LoadBalancer, ExternalName, Headless) ---8<---
+apiVersion: v1
+kind: Service
+metadata: { name: ext-db }
+spec:
+  ports: [{ port: 5432, targetPort: 5432 }]
+---
+apiVersion: discovery.k8s.io/v1
+kind: EndpointSlice
+metadata:
+  name: ext-db-1
+  labels: { kubernetes.io/service-name: ext-db }
+addressType: IPv4
+ports: [{ port: 5432, protocol: TCP }]
+endpoints:
+- { addresses: ["10.0.5.100"] }

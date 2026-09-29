@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Pod Creation — Reconciliation Flow</title>
+<style>
+  :root{--blue:#2563eb;--green:#059669;--teal:#0e7490;--purple:#7c3aed;--amber:#d97706;--red:#dc2626;--ink:#0f172a;--mut:#64748b;--line:#cbd5e1;--bg:#f8fafc;--card:#fff;}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:'Segoe UI',Helvetica,Arial,sans-serif;background:var(--bg);color:var(--ink);}
+  .wrap{max-width:960px;margin:0 auto;padding:18px 16px 40px;}
+  h1{font-size:20px;margin:0 0 2px;color:#1e3a8a;}
+  .sub{color:var(--mut);font-size:13px;margin-bottom:14px;}
+  .stage-card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:8px;box-shadow:0 1px 3px rgba(0,0,0,.06);}
+  svg{width:100%;height:auto;display:block}
+  .box{fill:#fff;stroke:var(--line);stroke-width:2;rx:10;transition:all .5s ease;}
+  .box.hot{stroke:var(--blue);stroke-width:3.5;filter:drop-shadow(0 0 6px rgba(37,99,235,.35));}
+  .lbl{font:600 14px 'Segoe UI';fill:var(--ink);}
+  .sublbl{font:11px 'Segoe UI';fill:var(--mut);}
+  .flow{stroke:var(--line);stroke-width:2.5;fill:none;marker-end:url(#arh);}
+  .flow.live{stroke:var(--blue);stroke-dasharray:7 6;animation:dash 1s linear infinite;}
+  @keyframes dash{to{stroke-dashoffset:-26}}
+  .tok{fill:var(--blue);opacity:0;transition:opacity .3s;}
+  .tok.on{opacity:1;}
+  .pod{fill:#e2e8f0;stroke:#94a3b8;stroke-width:2;opacity:0;transform-box:fill-box;transform-origin:center;transition:all .5s ease;}
+  .pod.show{opacity:1;}
+  .pod.run{fill:#bbf7d0;stroke:var(--green);}
+  .pod.pulse{animation:pp 1.4s ease-in-out infinite;}
+  @keyframes pp{0%,100%{transform:scale(1)}50%{transform:scale(1.08)}}
+  .podlbl{opacity:0;transition:opacity .5s;} .podlbl.show{opacity:1;}
+  .controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:14px 0 10px;}
+  button{font:600 13px 'Segoe UI';border:1px solid var(--line);background:#fff;color:var(--ink);padding:8px 14px;border-radius:8px;cursor:pointer;}
+  button.primary{background:var(--blue);color:#fff;border-color:var(--blue);}
+  button:hover{filter:brightness(.97)}
+  .stepn{color:var(--mut);font-size:13px;margin-left:auto;}
+  .cap{background:#eff6ff;border-left:4px solid var(--blue);border-radius:8px;padding:12px 14px;font-size:14px;min-height:44px;}
+  .cap b{color:#1e3a8a;}
+  .foot{color:var(--mut);font-size:12px;margin-top:12px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Pod Creation — the Reconciliation Loop</h1>
+  <div class="sub">Topic 1 &amp; 3 · what actually happens between <code>kubectl apply</code> and <code>3/3 Running</code></div>
+
+  <div class="stage-card">
+  <svg id="stage" viewBox="0 0 900 470" data-step="0">
+    <defs>
+      <marker id="arh" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#94a3b8"/></marker>
+    </defs>
+
+    <!-- control plane band -->
+    <rect x="20" y="20" width="860" height="200" rx="14" fill="#f1f5f9" stroke="#e2e8f0"/>
+    <text x="34" y="42" class="sublbl" style="font-weight:700;fill:#475569">CONTROL PLANE</text>
+
+    <!-- kubectl -->
+    <g id="b_kubectl"><rect class="box" x="34" y="90" width="120" height="66" rx="10"/>
+      <text x="94" y="120" text-anchor="middle" class="lbl">kubectl</text>
+      <text x="94" y="138" text-anchor="middle" class="sublbl">apply -f</text></g>
+    <!-- api server -->
+    <g id="b_api"><rect class="box" x="220" y="66" width="150" height="66" rx="10"/>
+      <text x="295" y="94" text-anchor="middle" class="lbl">API Server</text>
+      <text x="295" y="112" text-anchor="middle" class="sublbl">authN · authZ · admission</text></g>
+    <!-- etcd -->
+    <g id="b_etcd"><rect class="box" x="430" y="30" width="120" height="56" rx="10"/>
+      <text x="490" y="55" text-anchor="middle" class="lbl">etcd</text>
+      <text x="490" y="72" text-anchor="middle" class="sublbl">source of truth</text></g>
+    <!-- controller -->
+    <g id="b_ctrl"><rect class="box" x="430" y="120" width="150" height="66" rx="10"/>
+      <text x="505" y="148" text-anchor="middle" class="lbl">Controller</text>
+      <text x="505" y="166" text-anchor="middle" class="sublbl">Deploy&rarr;RS&rarr;Pods</text></g>
+    <!-- scheduler -->
+    <g id="b_sched"><rect class="box" x="640" y="120" width="150" height="66" rx="10"/>
+      <text x="715" y="148" text-anchor="middle" class="lbl">Scheduler</text>
+      <text x="715" y="166" text-anchor="middle" class="sublbl">filter &amp; score &rarr; bind</text></g>
+
+    <!-- node -->
+    <rect x="20" y="260" width="860" height="190" rx="14" fill="#f1f5f9" stroke="#e2e8f0"/>
+    <text x="34" y="282" class="sublbl" style="font-weight:700;fill:#475569">WORKER NODE</text>
+    <g id="b_kubelet"><rect class="box" x="34" y="320" width="150" height="66" rx="10"/>
+      <text x="109" y="348" text-anchor="middle" class="lbl">kubelet</text>
+      <text x="109" y="366" text-anchor="middle" class="sublbl">pull image · start</text></g>
+
+    <!-- pods -->
+    <g>
+      <rect id="p1" class="pod" x="300" y="320" width="150" height="46" rx="10"/>
+      <rect id="p2" class="pod" x="470" y="320" width="150" height="46" rx="10"/>
+      <rect id="p3" class="pod" x="640" y="320" width="150" height="46" rx="10"/>
+      <text x="375" y="348" text-anchor="middle" class="lbl podlbl" style="pointer-events:none">web-0</text>
+      <text x="545" y="348" text-anchor="middle" class="lbl podlbl" style="pointer-events:none">web-1</text>
+      <text x="715" y="348" text-anchor="middle" class="lbl podlbl" style="pointer-events:none">web-2</text>
+    </g>
+
+    <!-- flows -->
+    <path id="f1" class="flow" d="M154 123 H218"/>
+    <path id="f2" class="flow" d="M320 66 V60 H430 V58"/>
+    <path id="f3" class="flow" d="M340 120 Q360 150 428 152"/>
+    <path id="f4" class="flow" d="M580 153 H638"/>
+    <path id="f5" class="flow" d="M715 186 V300"/>
+    <path id="f6" class="flow" d="M109 386 V405 H375 V368"/>
+
+    <!-- token -->
+    <circle id="tok" class="tok" r="7" cx="94" cy="123"/>
+  </svg>
+  </div>
+
+  <div class="controls">
+    <button id="prev">‹ Prev</button>
+    <button id="next">Next ›</button>
+    <span class="stepn" id="stepn">Step 0 / 6</span>
+  </div>
+  <div class="cap" id="cap"></div>
+  <div class="foot">Every arrow is a <b>watch → act → report</b> control loop. No component talks to etcd except the API server.</div>
+</div>
+
+<script>
+const S = document.getElementById('stage');
+const STEPS = [
+  {cap:"<b>Desired state.</b> You run <code>kubectl apply -f deploy.yaml</code> asking for 3 replicas. Nothing exists yet — this is just intent.", hot:['b_kubectl'], flows:[], pods:[]},
+  {cap:"<b>API Server.</b> The request is authenticated, authorized, passed through admission controllers, validated — then accepted.", hot:['b_api'], flows:['f1'], tok:{path:'f1'}, pods:[]},
+  {cap:"<b>Persist to etcd.</b> The Deployment object is written to etcd, the cluster's single source of truth.", hot:['b_etcd'], flows:['f2'], pods:[]},
+  {cap:"<b>Controller reconciles.</b> The Deployment controller sees desired=3, creates a ReplicaSet and 3 Pod objects — all still <i>Pending</i> (grey).", hot:['b_ctrl'], flows:['f3'], pods:['show'] },
+  {cap:"<b>Scheduler binds.</b> Filter (which nodes fit?) then score (which is best?) — each Pod gets a node written to <code>spec.nodeName</code>.", hot:['b_sched'], flows:['f4'], pods:['show']},
+  {cap:"<b>kubelet runs them.</b> The node's kubelet pulls the image via the container runtime and starts the containers.", hot:['b_kubelet'], flows:['f5','f6'], pods:['show']},
+  {cap:"<b>3/3 Running.</b> kubelet reports status back to the API server. Reality now matches desired state — the loop rests until something changes.", hot:[], flows:[], pods:['show','run','pulse']},
+];
+let i=0, timer=null;
+
+function setStep(n){
+  i=(n+STEPS.length)%STEPS.length;
+  const st=STEPS[i];
+  S.setAttribute('data-step', i);
+  // boxes
+  ['b_kubectl','b_api','b_etcd','b_ctrl','b_sched','b_kubelet'].forEach(id=>{
+    const r=document.querySelector('#'+id+' .box'); if(r) r.classList.toggle('hot', st.hot.includes(id));
+  });
+  // flows
+  document.querySelectorAll('.flow').forEach(f=>f.classList.remove('live'));
+  (st.flows||[]).forEach(fid=>document.getElementById(fid).classList.add('live'));
+  // token
+  const tok=document.getElementById('tok'); tok.classList.toggle('on', !!st.tok);
+  // pods
+  ['p1','p2','p3'].forEach(pid=>{
+    const p=document.getElementById(pid);
+    p.classList.remove('show','run','pulse');
+    (st.pods||[]).forEach(c=>p.classList.add(c));
+  });
+  const showL=(st.pods||[]).includes('show');
+  document.querySelectorAll('.podlbl').forEach(t=>t.classList.toggle('show',showL));
+  document.getElementById('cap').innerHTML=st.cap;
+  document.getElementById('stepn').textContent=`Step ${i} / ${STEPS.length-1}`;
+}
+const DELAY=1900;
+function loopTimer(){ clearInterval(timer); timer=setInterval(()=>setStep(i+1),DELAY); }
+document.getElementById('next').onclick=()=>{ setStep(i+1); loopTimer(); };
+document.getElementById('prev').onclick=()=>{ setStep(i-1); loopTimer(); };
+setStep(0); loopTimer();
+</script>
+</body>
+</html>

@@ -1,0 +1,14 @@
+# ==============================================================
+# Manifests extracted from: Monitoring
+# Source: Kubernetes Complete Interview Study Notes
+# ==============================================================
+
+# ---8<--- (1) Topic 47 — Monitoring (Metrics Server, Prometheus, Grafana, GKE Managed Prometheus, CloudWatch Container Insights) ---8<---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata: { name: api-monitor, namespace: monitoring }
+spec:
+  selector: { matchLabels: { app: api } }
+  namespaceSelector: { matchNames: [prod] }
+  endpoints:
+  - { port: metrics, interval: 15s, path: /metrics }

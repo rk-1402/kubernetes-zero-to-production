@@ -1,0 +1,36 @@
+# ==============================================================
+# Manifests extracted from: ReplicaSets
+# Source: Kubernetes Complete Interview Study Notes
+# ==============================================================
+
+# ---8<--- (1) Topic 7 — ReplicaSets ---8<---
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+  name: web
+  labels: { app: web }
+spec:
+  replicas: 3
+  selector:
+    matchLabels: { app: web, tier: front }
+  template:
+    metadata:
+      labels: { app: web, tier: front }
+    spec:
+      containers:
+      - { name: nginx, image: nginx:1.27, ports: [{ containerPort: 80 }] }
+
+# ---8<--- (2) Topic 7 — ReplicaSets ---8<---
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata: { name: multi-env }
+spec:
+  replicas: 4
+  selector:
+    matchExpressions:
+    - { key: env, operator: In, values: [dev, staging] }
+    - { key: app, operator: Exists }
+  template:
+    metadata: { labels: { app: web, env: dev } }
+    spec:
+      containers: [{ name: nginx, image: nginx:1.27 }]

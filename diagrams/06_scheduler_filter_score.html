@@ -1,0 +1,97 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/><title>The Scheduler: Filter &rarr; Score &rarr; Bind</title>
+<style>
+:root{--blue:#2563eb;--green:#059669;--teal:#0e7490;--purple:#7c3aed;--amber:#d97706;--red:#dc2626;--ink:#0f172a;--mut:#64748b;--line:#cbd5e1;--bg:#f8fafc;--card:#fff;}
+*{box-sizing:border-box}
+body{margin:0;font-family:'Segoe UI',Helvetica,Arial,sans-serif;background:var(--bg);color:var(--ink);}
+.wrap{max-width:980px;margin:0 auto;padding:18px 16px 44px;}
+h1{font-size:20px;margin:0 0 2px;color:#1e3a8a;}
+.sub{color:var(--mut);font-size:13px;margin-bottom:14px;}
+.sub code,.cap code{background:#eef2ff;color:#3730a3;padding:1px 5px;border-radius:4px;font-family:Menlo,Consolas,monospace;}
+.stage-card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:8px;box-shadow:0 1px 3px rgba(0,0,0,.06);}
+svg{width:100%;height:auto;display:block}
+.box{fill:#fff;stroke:var(--line);stroke-width:2;transition:all .5s ease;}
+.box.hot{stroke:var(--blue);stroke-width:3.5;filter:drop-shadow(0 0 6px rgba(37,99,235,.35));}
+.box.ok{stroke:var(--green);stroke-width:3.5;filter:drop-shadow(0 0 6px rgba(5,150,105,.3));}
+.box.warn{stroke:var(--amber);stroke-width:3.5;}
+.box.deny{stroke:var(--red);stroke-width:3.5;}
+.lbl{font:600 14px 'Segoe UI';fill:var(--ink);}
+.sublbl{font:11px 'Segoe UI';fill:var(--mut);}
+.band{fill:#f1f5f9;stroke:#e2e8f0;}
+.bandlbl{font:700 11px 'Segoe UI';fill:#475569;letter-spacing:.5px;}
+.flow{stroke:var(--line);stroke-width:2.5;fill:none;marker-end:url(#arh);}
+.flow.live{stroke:var(--blue);stroke-dasharray:7 6;animation:dash 1s linear infinite;}
+.flow.ok{stroke:var(--green);stroke-dasharray:7 6;animation:dash 1s linear infinite;marker-end:url(#arhg);}
+.flow.deny{stroke:var(--red);stroke-dasharray:2 5;}
+@keyframes dash{to{stroke-dashoffset:-26}}
+.dyn{opacity:0;transition:all .55s ease;} .dyn.show{opacity:1;}
+.pod{fill:#e2e8f0;stroke:#94a3b8;stroke-width:2;transform-box:fill-box;transform-origin:center;}
+.pod.run{fill:#bbf7d0;stroke:var(--green);} .pod.warn{fill:#fde68a;stroke:var(--amber);} .pod.deny{fill:#fecaca;stroke:var(--red);}
+.pod.pulse{animation:pp 1.4s ease-in-out infinite;}
+@keyframes pp{0%,100%{transform:scale(1)}50%{transform:scale(1.07)}}
+.lamp{fill:#e2e8f0;stroke:#94a3b8;stroke-width:1.5;} .lamp.ok{fill:#22c55e;stroke:#16a34a;} .lamp.warn{fill:#f59e0b;stroke:#d97706;} .lamp.bad{fill:#ef4444;stroke:#dc2626;}
+.controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:14px 0 10px;}
+button{font:600 13px 'Segoe UI';border:1px solid var(--line);background:#fff;color:var(--ink);padding:8px 14px;border-radius:8px;cursor:pointer;}
+button.primary{background:var(--blue);color:#fff;border-color:var(--blue);} button:hover{filter:brightness(.97)}
+.stepn{color:var(--mut);font-size:13px;margin-left:auto;}
+.cap{background:#eff6ff;border-left:4px solid var(--blue);border-radius:8px;padding:12px 14px;font-size:14px;min-height:46px;}
+.cap b{color:#1e3a8a;}
+.foot{color:var(--mut);font-size:12px;margin-top:12px;}
+</style></head><body><div class="wrap">
+<h1>The Scheduler: Filter &rarr; Score &rarr; Bind</h1><div class="sub">Topic 32 · eliminate nodes that can't fit, rank the rest, bind the winner</div>
+<div class="stage-card">
+<svg id="stage" viewBox="0 0 900 460" data-step="0">
+<defs>
+<marker id="arh" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#94a3b8"/></marker>
+<marker id="arhg" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#059669"/></marker>
+</defs>
+
+<g id="bpod"><rect class="box" x="40" y="200" width="150" height="70" rx="10"/><text x="115.0" y="229.0" text-anchor="middle" class="lbl">Pending Pod</text><text x="115.0" y="247.0" text-anchor="middle" class="sublbl">needs 1 CPU, amd64</text></g>
+<g id="n1"><rect class="box" x="280" y="40" width="160" height="70" rx="10"/><text x="360.0" y="69.0" text-anchor="middle" class="lbl">node-1</text><text x="360.0" y="87.0" text-anchor="middle" class="sublbl">full: 0 CPU free</text></g>
+<g id="n2"><rect class="box" x="280" y="140" width="160" height="70" rx="10"/><text x="360.0" y="169.0" text-anchor="middle" class="lbl">node-2</text><text x="360.0" y="187.0" text-anchor="middle" class="sublbl">tainted: gpu</text></g>
+<g id="n3"><rect class="box" x="280" y="240" width="160" height="70" rx="10"/><text x="360.0" y="269.0" text-anchor="middle" class="lbl">node-3</text><text x="360.0" y="287.0" text-anchor="middle" class="sublbl">fits &#10003;</text></g>
+<g id="n4"><rect class="box" x="280" y="340" width="160" height="70" rx="10"/><text x="360.0" y="369.0" text-anchor="middle" class="lbl">node-4</text><text x="360.0" y="387.0" text-anchor="middle" class="sublbl">fits &#10003;</text></g>
+<text id="sc3" class="dyn sublbl" x="460" y="261" style="fill:#059669;font-weight:700">score 86</text>
+<text id="sc4" class="dyn sublbl" x="460" y="380" style="fill:#059669;font-weight:700">score 72</text>
+<g id="bind"><rect class="box" x="640" y="240" width="170" height="70" rx="10"/><text x="725.0" y="269.0" text-anchor="middle" class="lbl">BOUND</text><text x="725.0" y="287.0" text-anchor="middle" class="sublbl">spec.nodeName=node-3</text></g>
+<path id="fb" class="flow" d="M450 275 H636"/>
+
+</svg></div>
+<div class="controls">
+<button id="prev">&#8249; Prev</button><button id="next">Next &#8250;</button>
+<span class="stepn" id="stepn"></span></div>
+<div class="cap" id="cap"></div>
+<div class="foot">If <b>no</b> node passes filtering, the Pod stays Pending — that's when Cluster Autoscaler / Karpenter adds a node.</div>
+</div>
+<script>
+const S=document.getElementById('stage'),cap=document.getElementById('cap'),stepn=document.getElementById('stepn');
+const STEPS=[
+  {"cap": "<b>A Pod is Pending.</b> It requests 1 CPU and <code>arch=amd64</code>. The scheduler must pick a node.", "hot": ["bpod"]},
+  {"cap": "<b>Filter (predicates).</b> node-1 has no free CPU and node-2 has a <code>gpu</code> taint the Pod doesn't tolerate \u2014 both eliminated.", "deny": ["n1", "n2"], "hot": ["bpod"]},
+  {"cap": "<b>Score the survivors.</b> Remaining nodes are ranked 0&ndash;100 by least-allocated, image locality, topology spread\u2026 node-3 scores highest.", "ok": ["n3", "n4"], "on": ["sc3", "sc4"]},
+  {"cap": "<b>Bind.</b> The scheduler writes <code>spec.nodeName=node-3</code>. Its kubelet takes over from here.", "ok": ["n3"], "on": ["sc3", "sc4", "bind"], "flowsok": ["fb"], "cls": [["bind", "run"]]}
+];
+let i=0,timer=null;
+function setStep(n){
+  i=(n+STEPS.length)%STEPS.length;const st=STEPS[i];S.setAttribute('data-step',i);
+  document.querySelectorAll('.box').forEach(b=>b.classList.remove('hot','ok','warn','deny'));
+  document.querySelectorAll('.flow').forEach(f=>f.classList.remove('live','ok','deny'));
+  document.querySelectorAll('.dyn').forEach(d=>d.classList.remove('show','run','pulse','warn','deny','ok'));
+  document.querySelectorAll('.lamp').forEach(l=>l.classList.remove('ok','warn','bad'));
+  (st.hot||[]).forEach(id=>{const b=document.querySelector('#'+id+' .box'); if(b)b.classList.add('hot');});
+  (st.ok||[]).forEach(id=>{const b=document.querySelector('#'+id+' .box'); if(b)b.classList.add('ok');});
+  (st.warn||[]).forEach(id=>{const b=document.querySelector('#'+id+' .box'); if(b)b.classList.add('warn');});
+  (st.deny||[]).forEach(id=>{const b=document.querySelector('#'+id+' .box'); if(b)b.classList.add('deny');});
+  (st.flows||[]).forEach(f=>{const e=document.getElementById(f); if(e)e.classList.add('live');});
+  (st.flowsok||[]).forEach(f=>{const e=document.getElementById(f); if(e)e.classList.add('ok');});
+  (st.flowsdeny||[]).forEach(f=>{const e=document.getElementById(f); if(e)e.classList.add('deny');});
+  (st.on||[]).forEach(id=>{const e=document.getElementById(id); if(e)e.classList.add('show');});
+  (st.cls||[]).forEach(a=>{const e=document.getElementById(a[0]); if(e)e.classList.add(a[1]);});
+  cap.innerHTML=st.cap;stepn.textContent='Step '+i+' / '+(STEPS.length-1);
+}
+const DELAY=2000;
+function loopTimer(){clearInterval(timer);timer=setInterval(()=>setStep(i+1),DELAY);}
+document.getElementById('next').onclick=()=>{setStep(i+1);loopTimer();};
+document.getElementById('prev').onclick=()=>{setStep(i-1);loopTimer();};
+setStep(0);loopTimer();
+</script></body></html>

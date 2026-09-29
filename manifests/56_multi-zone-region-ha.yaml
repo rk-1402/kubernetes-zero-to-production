@@ -1,0 +1,17 @@
+# ==============================================================
+# Manifests extracted from: Multi Zone Region HA
+# Source: Kubernetes Complete Interview Study Notes
+# ==============================================================
+
+# ---8<--- (1) Topic 56 — Multi-Zone / Multi-Region HA ---8<---
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata: { name: web }
+spec:
+  generators:
+  - clusters:
+      selector: { matchLabels: { env: prod } }
+  template:
+    spec:
+      source: { repoURL: https://github.com/org/k8s-manifests, path: prod }
+      destination: { server: '{{server}}', namespace: prod }

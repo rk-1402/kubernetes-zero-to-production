@@ -1,0 +1,120 @@
+# ==============================================================
+# Manifests extracted from: Network Policies Deep
+# Source: Kubernetes Complete Interview Study Notes
+# ==============================================================
+
+# ---8<--- (1) Topic 44 — Network Policies (Deep Dive) ---8<---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata: { name: allow-github }
+spec:
+  endpointSelector: { matchLabels: { app: ci } }
+  egress:
+  - toFQDNs: [{ matchPattern: "*.github.com" }]
+    toPorts: [{ ports: [{ port: "443", protocol: TCP }] }]
+  - toEndpoints: [{ matchLabels: { k8s:io.kubernetes.pod.namespace: kube-system, k8s-app: kube-dns } }]
+    toPorts: [{ ports: [{ port: "53", protocol: ANY }] }]
+
+# ---8<--- (2) Topic 44 — Network Policies (Deep Dive) ---8<---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata: { name: l7-api }
+spec:
+  endpointSelector: { matchLabels: { app: api } }
+  ingress:
+  - fromEndpoints: [{ matchLabels: { app: frontend } }]
+    toPorts:
+    - ports: [{ port: "8080", protocol: TCP }]
+      rules:
+        http:
+        - method: GET
+          path: "/api/v1/.*"
+        - method: POST
+          path: "/api/v1/orders"
+
+# ---8<--- (3) Topic 44 — Network Policies (Deep Dive) ---8<---
+apiVersion: projectcalico.org/v3
+kind: GlobalNetworkPolicy
+metadata: { name: deny-egress-to-metadata }
+spec:
+  selector: all()
+  types: [Egress]
+  egress:
+  - action: Deny
+    destination:
+      nets: ["169.254.169.254/32"]     # block IMDS
+
+# ---8<--- (4) Topic 44 — Network Policies (Deep Dive) ---8<---
+# deny-all.yaml
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: { name: deny-all, namespace: prod }
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+---
+# allow-dns.yaml
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: { name: allow-dns, namespace: prod }
+spec:
+  podSelector: {}
+  policyTypes: [Egress]
+  egress:
+  - ports: [{ protocol: UDP, port: 53 }, { protocol: TCP, port: 53 }]
+---
+# allow-frontend-ingress.yaml
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: { name: allow-ingress-to-frontend, namespace: prod }
+spec:
+  podSelector: { matchLabels: { app: frontend } }
+  policyTypes: [Ingress]
+  ingress:
+  - from: [{ namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: ingress-nginx } } }]
+    ports: [{ port: 80 }]
+---
+# allow-frontend-to-api.yaml
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: { name: allow-frontend-to-api, namespace: prod }
+spec:
+  podSelector: { matchLabels: { app: api } }
+  policyTypes: [Ingress]
+  ingress:
+  - from: [{ podSelector: { matchLabels: { app: frontend } } }]
+    ports: [{ port: 8080 }]
+---
+# allow-api-to-db.yaml
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: { name: allow-api-to-db, namespace: prod }
+spec:
+  podSelector: { matchLabels: { app: db } }
+  policyTypes: [Ingress]
+  ingress:
+  - from: [{ podSelector: { matchLabels: { app: api } } }]
+    ports: [{ port: 5432 }]
+---
+# allow-external-egress.yaml
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: { name: allow-external-https, namespace: prod }
+spec:
+  podSelector: { matchLabels: { app: api } }
+  policyTypes: [Egress]
+  egress:
+  - to: [{ ipBlock: { cidr: 0.0.0.0/0, except: [10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16] } }]
+    ports: [{ port: 443, protocol: TCP }]
+  - ports: [{ protocol: UDP, port: 53 }]
+---
+# allow-prometheus-scrape.yaml
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: { name: allow-prometheus, namespace: prod }
+spec:
+  podSelector: {}
+  policyTypes: [Ingress]
+  ingress:
+  - from: [{ namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: monitoring } } }]
+    ports: [{ port: 9090 }]

@@ -1,0 +1,153 @@
+# ==============================================================
+# Manifests extracted from: module_11_topics_67_to_70
+# Source: Kubernetes Complete Interview Study Notes
+# ==============================================================
+
+# ---8<--- (1) Topic 67 — GKE Standard vs GKE Autopilot — Full Comparison ---8<---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: api }
+spec:
+  replicas: 3
+  selector: { matchLabels: { app: api } }
+  template:
+    metadata: { labels: { app: api } }
+    spec:
+      nodeSelector:
+        cloud.google.com/compute-class: Performance
+        cloud.google.com/machine-family: c3
+      containers:
+        - name: api
+          image: gcr.io/my-project/api:1.2.3
+          resources:
+            requests: { cpu: "2", memory: "4Gi" }
+            limits:   { cpu: "2", memory: "4Gi" }
+
+# ---8<--- (2) Topic 67 — GKE Standard vs GKE Autopilot — Full Comparison ---8<---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: batch-worker }
+spec:
+  replicas: 10
+  selector: { matchLabels: { app: worker } }
+  template:
+    metadata: { labels: { app: worker } }
+    spec:
+      terminationGracePeriodSeconds: 25
+      nodeSelector:
+        cloud.google.com/gke-spot: "true"
+      tolerations:
+        - key: cloud.google.com/gke-spot
+          operator: Equal
+          value: "true"
+          effect: NoSchedule
+      containers:
+        - name: worker
+          image: my-repo/worker:2.0
+          resources:
+            requests: { cpu: "500m", memory: "1Gi" }
+
+# ---8<--- (3) Topic 68 — EKS Managed Node Groups vs Self-Managed Nodes vs Fargate ---8<---
+# cluster.yaml
+apiVersion: eksctl.io/v1alpha5
+kind: ClusterConfig
+metadata:
+  name: shop
+  region: us-east-1
+  version: "1.31"
+iam:
+  withOIDC: true
+managedNodeGroups:
+  - name: mng-general
+    instanceTypes: ["m6i.large", "m6a.large", "m5.large"]
+    minSize: 2
+    maxSize: 10
+    desiredCapacity: 3
+    volumeSize: 60
+    labels: { role: general }
+    tags: { team: platform }
+    iam:
+      withAddonPolicies:
+        externalDNS: true
+        certManager: true
+  - name: mng-gpu
+    instanceType: g4dn.xlarge
+    minSize: 0
+    maxSize: 5
+    desiredCapacity: 0
+    labels: { workload: ml }
+    taints:
+      - key: nvidia.com/gpu
+        value: "true"
+        effect: NoSchedule
+
+# ---8<--- (4) Topic 68 — EKS Managed Node Groups vs Self-Managed Nodes vs Fargate ---8<---
+apiVersion: eksctl.io/v1alpha5
+kind: ClusterConfig
+metadata:
+  name: shop
+  region: us-east-1
+fargateProfiles:
+  - name: fp-serverless
+    selectors:
+      - namespace: serverless
+      - namespace: kube-system
+        labels: { k8s-app: kube-dns }
+
+# ---8<--- (5) Topic 68 — EKS Managed Node Groups vs Self-Managed Nodes vs Fargate ---8<---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api
+  namespace: serverless
+spec:
+  replicas: 2
+  selector: { matchLabels: { app: api } }
+  template:
+    metadata: { labels: { app: api } }
+    spec:
+      containers:
+        - name: api
+          image: 123456789012.dkr.ecr.us-east-1.amazonaws.com/api:1.0
+          resources:
+            requests: { cpu: "500m", memory: "1Gi" }
+            limits:   { cpu: "500m", memory: "1Gi" }
+
+# ---8<--- (6) Topic 68 — EKS Managed Node Groups vs Self-Managed Nodes vs Fargate ---8<---
+apiVersion: karpenter.sh/v1
+kind: NodePool
+metadata: { name: default }
+spec:
+  template:
+    spec:
+      requirements:
+        - key: kubernetes.io/arch
+          operator: In
+          values: ["amd64"]
+        - key: karpenter.sh/capacity-type
+          operator: In
+          values: ["spot", "on-demand"]
+        - key: karpenter.k8s.aws/instance-family
+          operator: In
+          values: ["m6i", "m6a", "m5", "c6i", "r6i"]
+      nodeClassRef:
+        group: karpenter.k8s.aws
+        kind: EC2NodeClass
+        name: default
+      expireAfter: 720h
+  disruption:
+    consolidationPolicy: WhenUnderutilized
+    expireAfter: 720h
+---
+apiVersion: karpenter.k8s.aws/v1
+kind: EC2NodeClass
+metadata: { name: default }
+spec:
+  amiFamily: Bottlerocket
+  subnetSelectorTerms:
+    - tags: { karpenter.sh/discovery: shop }
+  securityGroupSelectorTerms:
+    - tags: { karpenter.sh/discovery: shop }
+  role: KarpenterNodeRole-shop
+  tags:
+    team: platform

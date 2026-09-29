@@ -1,0 +1,39 @@
+# ==============================================================
+# Manifests extracted from: RBAC
+# Source: Kubernetes Complete Interview Study Notes
+# ==============================================================
+
+# ---8<--- (1) Topic 39 — RBAC (Roles, ClusterRoles, RoleBindings, ClusterRoleBindings) ---8<---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata: { name: pod-reader, namespace: dev }
+rules:
+- apiGroups: [""]
+  resources: ["pods", "pods/log"]
+  verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata: { name: alice-pod-reader, namespace: dev }
+subjects:
+- { kind: User, name: alice, apiGroup: rbac.authorization.k8s.io }
+roleRef:
+  kind: Role
+  name: pod-reader
+  apiGroup: rbac.authorization.k8s.io
+
+# ---8<--- (2) Topic 39 — RBAC (Roles, ClusterRoles, RoleBindings, ClusterRoleBindings) ---8<---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata: { name: dev-edit, namespace: dev }
+subjects:
+- { kind: Group, name: dev-team, apiGroup: rbac.authorization.k8s.io }
+roleRef: { kind: ClusterRole, name: edit, apiGroup: rbac.authorization.k8s.io }
+
+# ---8<--- (3) Topic 39 — RBAC (Roles, ClusterRoles, RoleBindings, ClusterRoleBindings) ---8<---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata: { name: prometheus-reader }
+subjects:
+- { kind: ServiceAccount, name: prometheus, namespace: monitoring }
+roleRef: { kind: ClusterRole, name: view, apiGroup: rbac.authorization.k8s.io }

@@ -1,0 +1,44 @@
+# ==============================================================
+# Manifests extracted from: Storage Classes
+# Source: Kubernetes Complete Interview Study Notes
+# ==============================================================
+
+# ---8<--- (1) Topic 29 — Storage Classes and Dynamic Provisioning ---8<---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: gp3
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "true"
+provisioner: ebs.csi.aws.com
+parameters:
+  type: gp3
+  iops: "3000"
+  throughput: "125"
+  encrypted: "true"
+  kmsKeyId: arn:aws:kms:ap-south-1:123:key/abc
+reclaimPolicy: Retain
+volumeBindingMode: WaitForFirstConsumer
+allowVolumeExpansion: true
+
+# ---8<--- (2) Topic 29 — Storage Classes and Dynamic Provisioning ---8<---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata: { name: regional-ssd }
+provisioner: pd.csi.storage.gke.io
+parameters:
+  type: pd-ssd
+  replication-type: regional-pd
+reclaimPolicy: Retain
+volumeBindingMode: WaitForFirstConsumer
+allowVolumeExpansion: true
+
+# ---8<--- (3) Topic 29 — Storage Classes and Dynamic Provisioning ---8<---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata: { name: efs }
+provisioner: efs.csi.aws.com
+parameters:
+  provisioningMode: efs-ap
+  fileSystemId: fs-0abc123
+  directoryPerms: "700"

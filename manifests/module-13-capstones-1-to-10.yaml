@@ -1,0 +1,403 @@
+# ==============================================================
+# Manifests extracted from: module_13_capstones_1_to_10
+# Source: Kubernetes Complete Interview Study Notes
+# ==============================================================
+
+# ---8<--- (1) Capstone 1 — Deploy a 3-Tier Web Application (Frontend + Backend + MySQL) on Minikube → GKE Autopilot → EKS Fargate ---8<---
+apiVersion: v1
+kind: Namespace
+metadata: { name: shop, labels: { pod-security.kubernetes.io/enforce: baseline } }
+
+# ---8<--- (2) Capstone 1 — Deploy a 3-Tier Web Application (Frontend + Backend + MySQL) on Minikube → GKE Autopilot → EKS Fargate ---8<---
+apiVersion: v1
+kind: Service
+metadata: { name: mysql, namespace: shop }
+spec:
+  clusterIP: None
+  selector: { app: mysql }
+  ports: [{ port: 3306, name: mysql }]
+---
+apiVersion: v1
+kind: Secret
+metadata: { name: mysql-secret, namespace: shop }
+stringData:
+  MYSQL_ROOT_PASSWORD: changeme
+  MYSQL_DATABASE: shopdb
+  MYSQL_USER: shop
+  MYSQL_PASSWORD: shoppass
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata: { name: mysql, namespace: shop }
+spec:
+  serviceName: mysql
+  replicas: 1
+  selector: { matchLabels: { app: mysql } }
+  template:
+    metadata: { labels: { app: mysql } }
+    spec:
+      containers:
+        - name: mysql
+          image: mysql:8.0
+          envFrom: [{ secretRef: { name: mysql-secret } }]
+          ports: [{ containerPort: 3306 }]
+          resources:
+            requests: { cpu: "250m", memory: "512Mi" }
+            limits:   { cpu: "1",   memory: "1Gi" }
+          readinessProbe:
+            exec: { command: ["sh","-c","mysqladmin -uroot -p$MYSQL_ROOT_PASSWORD ping"] }
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/mysql
+  volumeClaimTemplates:
+    - metadata: { name: data }
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources: { requests: { storage: 10Gi } }
+
+# ---8<--- (3) Capstone 1 — Deploy a 3-Tier Web Application (Frontend + Backend + MySQL) on Minikube → GKE Autopilot → EKS Fargate ---8<---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: backend, namespace: shop }
+spec:
+  replicas: 2
+  selector: { matchLabels: { app: backend } }
+  template:
+    metadata: { labels: { app: backend } }
+    spec:
+      containers:
+        - name: backend
+          image: myrepo/shop-backend:1.0
+          ports: [{ containerPort: 8080 }]
+          env:
+            - name: DB_HOST
+              value: mysql.shop.svc.cluster.local
+            - { name: DB_USER, valueFrom: { secretKeyRef: { name: mysql-secret, key: MYSQL_USER } } }
+            - { name: DB_PASS, valueFrom: { secretKeyRef: { name: mysql-secret, key: MYSQL_PASSWORD } } }
+            - { name: DB_NAME, valueFrom: { secretKeyRef: { name: mysql-secret, key: MYSQL_DATABASE } } }
+          resources:
+            requests: { cpu: "250m", memory: "512Mi" }
+            limits:   { cpu: "500m", memory: "512Mi" }
+          readinessProbe:
+            httpGet: { path: /healthz, port: 8080 }
+            initialDelaySeconds: 5
+
+# ---8<--- (4) Capstone 1 — Deploy a 3-Tier Web Application (Frontend + Backend + MySQL) on Minikube → GKE Autopilot → EKS Fargate ---8<---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: frontend, namespace: shop }
+spec:
+  replicas: 2
+  selector: { matchLabels: { app: frontend } }
+  template:
+    metadata: { labels: { app: frontend } }
+    spec:
+      containers:
+        - name: frontend
+          image: myrepo/shop-frontend:1.0
+          ports: [{ containerPort: 3000 }]
+          env:
+            - name: BACKEND_URL
+              value: http://backend.shop.svc.cluster.local:8080
+          resources:
+            requests: { cpu: "250m", memory: "512Mi" }
+            limits:   { cpu: "500m", memory: "512Mi" }
+
+# ---8<--- (5) Capstone 1 — Deploy a 3-Tier Web Application (Frontend + Backend + MySQL) on Minikube → GKE Autopilot → EKS Fargate ---8<---
+apiVersion: v1
+kind: Service
+metadata: { name: backend, namespace: shop }
+spec:
+  selector: { app: backend }
+  ports: [{ port: 8080, targetPort: 8080 }]
+---
+apiVersion: v1
+kind: Service
+metadata: { name: frontend, namespace: shop }
+spec:
+  type: LoadBalancer
+  selector: { app: frontend }
+  ports: [{ port: 80, targetPort: 3000 }]
+
+# ---8<--- (6) Capstone 1 — Deploy a 3-Tier Web Application (Frontend + Backend + MySQL) on Minikube → GKE Autopilot → EKS Fargate ---8<---
+# fargate-cluster.yaml
+apiVersion: eksctl.io/v1alpha5
+kind: ClusterConfig
+metadata: { name: capstone1, region: us-east-1, version: "1.31" }
+iam: { withOIDC: true }
+fargateProfiles:
+  - name: fp-shop
+    selectors:
+      - namespace: shop
+      - namespace: kube-system
+        labels: { k8s-app: kube-dns }
+
+# ---8<--- (7) Capstone 3 — HPA + Cluster Autoscaler on GKE and Karpenter on EKS Under Load Testing (hey / k6) ---8<---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: backend, namespace: shop }
+spec:
+  replicas: 2
+  selector: { matchLabels: { app: backend } }
+  template:
+    metadata: { labels: { app: backend } }
+    spec:
+      containers:
+        - name: backend
+          image: myrepo/shop-backend:1.0
+          resources:
+            requests: { cpu: "250m", memory: "256Mi" }
+            limits:   { cpu: "500m", memory: "512Mi" }
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata: { name: backend-hpa, namespace: shop }
+spec:
+  scaleTargetRef: { apiVersion: apps/v1, kind: Deployment, name: backend }
+  minReplicas: 2
+  maxReplicas: 50
+  metrics:
+    - type: Resource
+      resource: { name: cpu, target: { type: Utilization, averageUtilization: 60 } }
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 30
+      policies: [{ type: Percent, value: 100, periodSeconds: 30 }]
+    scaleDown:
+      stabilizationWindowSeconds: 300
+
+# ---8<--- (8) Capstone 4 — Ingress with TLS: cert-manager + Let's Encrypt on GKE (GCE Ingress) and EKS (ALB Ingress) ---8<---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata: { name: letsencrypt-prod }
+spec:
+  acme:
+    server: https://acme-v02.api.letsencrypt.org/directory
+    email: you@example.com
+    privateKeySecretRef: { name: letsencrypt-prod }
+    solvers:
+      - http01:
+          ingress:
+            class: gce         # for GKE; use "alb" for EKS
+
+# ---8<--- (9) Capstone 4 — Ingress with TLS: cert-manager + Let's Encrypt on GKE (GCE Ingress) and EKS (ALB Ingress) ---8<---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: shop
+  namespace: shop
+  annotations:
+    kubernetes.io/ingress.class: "gce"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    kubernetes.io/ingress.global-static-ip-name: "shop-ip"
+spec:
+  tls:
+    - hosts: [shop.example.com]
+      secretName: shop-tls
+  rules:
+    - host: shop.example.com
+      http:
+        paths:
+          - path: /*
+            pathType: ImplementationSpecific
+            backend: { service: { name: frontend, port: { number: 80 } } }
+
+# ---8<--- (10) Capstone 7 for IRSA pattern) ---8<---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: shop
+  namespace: shop
+  annotations:
+    kubernetes.io/ingress.class: alb
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80},{"HTTPS":443}]'
+    alb.ingress.kubernetes.io/ssl-redirect: '443'
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+spec:
+  tls:
+    - hosts: [shop.example.com]
+      secretName: shop-tls
+  rules:
+    - host: shop.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend: { service: { name: frontend, port: { number: 80 } } }
+
+# ---8<--- (11) Capstone 5 — Full Observability Stack: Prometheus + Grafana + Loki + Alertmanager on GKE and EKS ---8<---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: backend
+  namespace: monitoring
+  labels: { release: kube-prom }
+spec:
+  selector: { matchLabels: { app: backend } }
+  namespaceSelector: { matchNames: [shop] }
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 15s
+
+# ---8<--- (12) Capstone 5 — Full Observability Stack: Prometheus + Grafana + Loki + Alertmanager on GKE and EKS ---8<---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: shop-slo
+  namespace: monitoring
+  labels: { release: kube-prom }
+spec:
+  groups:
+    - name: shop.rules
+      rules:
+        - alert: BackendHighLatency
+          expr: |
+            histogram_quantile(0.95,
+              sum by (le) (rate(http_request_duration_seconds_bucket{job="backend"}[5m]))
+            ) > 0.5
+          for: 5m
+          labels: { severity: warning }
+          annotations:
+            summary: "Backend P95 latency > 500ms"
+
+# ---8<--- (13) Capstone 6 — StatefulSet PostgreSQL with PVC on GKE Filestore + EKS EBS/EFS, Including Backup and Restore ---8<---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata: { name: filestore-sc }
+provisioner: filestore.csi.storage.gke.io
+parameters: { tier: BASIC_HDD, network: default }
+allowVolumeExpansion: true
+
+# ---8<--- (14) Capstone 6 — StatefulSet PostgreSQL with PVC on GKE Filestore + EKS EBS/EFS, Including Backup and Restore ---8<---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata: { name: gp3-sc }
+provisioner: ebs.csi.aws.com
+parameters: { type: gp3, iops: "3000", throughput: "125" }
+allowVolumeExpansion: true
+volumeBindingMode: WaitForFirstConsumer
+
+# ---8<--- (15) Capstone 6 — StatefulSet PostgreSQL with PVC on GKE Filestore + EKS EBS/EFS, Including Backup and Restore ---8<---
+apiVersion: batch/v1
+kind: CronJob
+metadata: { name: pg-backup, namespace: db }
+spec:
+  schedule: "0 * * * *"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccountName: pg-backup-sa   # IRSA / WLI SA
+          restartPolicy: OnFailure
+          containers:
+            - name: dump
+              image: postgres:16
+              env:
+                - name: PGPASSWORD
+                  valueFrom: { secretKeyRef: { name: pg-postgresql, key: postgres-password } }
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  TS=$(date +%Y%m%d-%H%M)
+                  pg_dump -h pg-postgresql -U postgres shopdb | gzip > /tmp/backup-$TS.sql.gz
+                  aws s3 cp /tmp/backup-$TS.sql.gz s3://acme-pg-backups/shopdb/backup-$TS.sql.gz
+
+# ---8<--- (16) Capstone 7 — Enforce Security: RBAC + NetworkPolicy + Pod Security Admission + WLI (GKE) + IRSA (EKS) ---8<---
+apiVersion: v1
+kind: ServiceAccount
+metadata: { name: shop-dev, namespace: shop }
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata: { name: shop-dev, namespace: shop }
+rules:
+  - apiGroups: ["", "apps"]
+    resources: ["pods", "deployments", "services", "configmaps"]
+    verbs: ["get","list","watch","create","update","patch","delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata: { name: shop-dev, namespace: shop }
+subjects: [{ kind: User, name: dev@acme.io, apiGroup: rbac.authorization.k8s.io }]
+roleRef: { kind: Role, name: shop-dev, apiGroup: rbac.authorization.k8s.io }
+
+# ---8<--- (17) Capstone 7 — Enforce Security: RBAC + NetworkPolicy + Pod Security Admission + WLI (GKE) + IRSA (EKS) ---8<---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: { name: default-deny, namespace: shop }
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: { name: allow-dns, namespace: shop }
+spec:
+  podSelector: {}
+  policyTypes: [Egress]
+  egress:
+    - to: [{ namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: kube-system } } }]
+      ports: [{ protocol: UDP, port: 53 }, { protocol: TCP, port: 53 }]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: { name: frontend-to-backend, namespace: shop }
+spec:
+  podSelector: { matchLabels: { app: backend } }
+  policyTypes: [Ingress]
+  ingress:
+    - from: [{ podSelector: { matchLabels: { app: frontend } } }]
+      ports: [{ port: 8080 }]
+
+# ---8<--- (18) Capstone 8 — GitOps Deployment Using ArgoCD on GKE and EKS with Multi-Environment (dev/stage/prod) Sync ---8<---
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata: { name: shop, namespace: argocd }
+spec:
+  generators:
+    - list:
+        elements:
+          - env: dev
+            cluster: https://kubernetes.default.svc      # GKE hub
+            valuesFile: envs/dev/values.yaml
+          - env: stage
+            cluster: https://kubernetes.default.svc
+            valuesFile: envs/stage/values.yaml
+          - env: prod-gke
+            cluster: https://kubernetes.default.svc
+            valuesFile: envs/prod/values.yaml
+          - env: prod-eks
+            cluster: https://<eks-endpoint>              # from argocd cluster list
+            valuesFile: envs/prod/values.yaml
+  template:
+    metadata: { name: 'shop-{{env}}' }
+    spec:
+      project: default
+      source:
+        repoURL: https://github.com/acme/shop-config
+        targetRevision: main
+        path: charts/shop
+        helm:
+          valueFiles: ['../../{{valuesFile}}']
+      destination:
+        server: '{{cluster}}'
+        namespace: 'shop-{{env}}'
+      syncPolicy:
+        automated: { prune: true, selfHeal: true }
+        syncOptions: [CreateNamespace=true, ServerSideApply=true]
+
+# ---8<--- (19) Capstone 9 — Build and Deploy a Custom Operator Using Kubebuilder on GKE and EKS ---8<---
+apiVersion: platform.acme.io/v1
+kind: Tenant
+metadata: { name: shop }
+spec:
+  team: shop
+  cpu: "10"
+  memory: 20Gi
+  admins: [alice@acme.io, bob@acme.io]

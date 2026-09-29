@@ -1,0 +1,17 @@
+# ==============================================================
+# Manifests extracted from: Authentication Authorization
+# Source: Kubernetes Complete Interview Study Notes
+# ==============================================================
+
+# ---8<--- (1) Topic 38 — Authentication and Authorization ---8<---
+apiVersion: audit.k8s.io/v1
+kind: Policy
+rules:
+- level: Metadata
+  resources: [{ group: "", resources: ["secrets"] }]
+  verbs: ["get","list","watch"]
+- level: RequestResponse
+  resources: [{ group: "", resources: ["pods"] }]
+  verbs: ["create","delete"]
+- level: None
+  resources: [{ group: "", resources: ["events"] }]
